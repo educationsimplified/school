@@ -1,0 +1,629 @@
+/**
+ * ============================================================
+ *  SCHOOL WEBSITE — BACKEND (Google Apps Script)
+ *  Sheets = database, Drive = file storage
+ *  Deploy as Web App (Execute as: Me, Access: Anyone)
+ * ============================================================
+ *
+ *  Talks to two externally-hosted front ends (index.html, admin.html)
+ *  via plain fetch(): reads use GET (doGet), writes use POST with a
+ *  Content-Type of text/plain (doPost) — text/plain keeps it a
+ *  "simple request" so the browser skips the CORS preflight that
+ *  Apps Script doesn't implement (no doOptions).
+ *
+ *  Run `setup()` once from the Apps Script editor before first use.
+ * ============================================================
+ */
+
+/* ---------------------------------------------------------------
+ *  0. CONFIG / BOOTSTRAP
+ * --------------------------------------------------------------- */
+
+const SHEET_NAMES = {
+  CONFIG: 'Config',
+  GALLERY: 'Gallery',
+  NEWS: 'News',
+  VIDEOS: 'Videos',
+  FEATURED: 'Featured',
+  EVENTS: 'Events',
+  ENQUIRIES: 'Enquiries',
+  PROGRAMS: 'Programs',
+  STEPS: 'AdmissionSteps',
+  AFFILIATIONS: 'Affiliations'
+};
+
+const HEADERS = {
+  Config: ['key', 'value'],
+  Gallery: ['id', 'title', 'category', 'imageUrl', 'source', 'driveFileId', 'createdAt'],
+  News: ['id', 'title', 'summary', 'content', 'imageUrl', 'imageFileId', 'pdfUrl', 'pdfFileId',
+    'category', 'author', 'date', 'published', 'views'],
+  Videos: ['id', 'title', 'youtubeUrl', 'category', 'description', 'date'],
+  Featured: ['id', 'type', 'url', 'driveFileId', 'title', 'caption', 'sortOrder', 'active'],
+  Events: ['id', 'title', 'description', 'date', 'endDate', 'time', 'location', 'category', 'color'],
+  Enquiries: ['id', 'name', 'email', 'phone', 'subject', 'message', 'date', 'status'],
+  Programs: ['id', 'stage', 'name', 'description', 'tags', 'sortOrder'],
+  AdmissionSteps: ['id', 'title', 'description', 'sortOrder'],
+  Affiliations: ['id', 'name', 'imageUrl', 'driveFileId', 'link', 'sortOrder']
+};
+
+const MAX_PDF_BYTES = 1024 * 1024; // 1 MB hard limit
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4 MB safety cap for images
+const SESSION_TTL_SECONDS = 6 * 60 * 60; // 6 hour admin session
+
+/**
+ * Run this once manually from the Apps Script editor.
+ * Creates the Spreadsheet + Drive folder and stores their IDs,
+ * writes sheet headers, and sets a default admin password.
+ */
+function setup() {
+  const props = PropertiesService.getScriptProperties();
+
+  let ssId = props.getProperty('SHEET_ID');
+  if (!ssId) {
+    const ss = SpreadsheetApp.create('School Website Database');
+    ssId = ss.getId();
+    props.setProperty('SHEET_ID', ssId);
+  }
+  const ss = SpreadsheetApp.openById(ssId);
+
+  Object.keys(HEADERS).forEach(function (name) {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    if (sh.getRange(1, 1).getValue() === '') {
+      sh.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);
+      sh.setFrozenRows(1);
+    }
+  });
+  // remove default "Sheet1" if still empty/unused
+  const def = ss.getSheetByName('Sheet1');
+  if (def && ss.getSheets().length > 1) ss.deleteSheet(def);
+
+  let folderId = props.getProperty('DRIVE_FOLDER_ID');
+  if (!folderId) {
+    const folder = DriveApp.createFolder('School Website Uploads');
+    folderId = folder.getId();
+    props.setProperty('DRIVE_FOLDER_ID', folderId);
+  }
+
+  if (!props.getProperty('ADMIN_PASSWORD')) {
+    props.setProperty('ADMIN_PASSWORD', 'ChangeMe123!'); // CHANGE THIS after setup
+  }
+
+  const configSheet = ss.getSheetByName(SHEET_NAMES.CONFIG);
+  const defaults = {
+    SCHOOL_NAME: 'Greenwood Public School',
+    SCHOOL_INITIALS: 'GP',
+    EST_LINE: 'EST. 1998 · CBSE AFFILIATED',
+    TAGLINE: 'Nurturing Minds, Building Futures',
+    LOGO_URL: '',
+    POPUP_ACTIVE: 'false',
+    POPUP_IMAGE: '',
+    POPUP_TITLE: '',
+    POPUP_LINK: '',
+    CONTACT_EMAIL: '',
+    CONTACT_PHONE: '',
+    ADDRESS: '',
+
+    HERO_EYEBROW: 'Admissions Open for 2026–27',
+    HERO_TITLE: 'Where curious minds become confident learners.',
+    HERO_HIGHLIGHT: 'confident learners',
+    HERO_DESC: 'A rigorous curriculum blended with hands-on learning, sport, and the arts — nurturing every student from kindergarten through senior secondary.',
+
+    STAT1_VALUE: '1,240', STAT1_LABEL: 'Students Enrolled',
+    STAT2_VALUE: '14:1', STAT2_LABEL: 'Student–Teacher Ratio',
+    STAT3_VALUE: '98.6%', STAT3_LABEL: 'Class XII Pass Rate',
+    STAT4_VALUE: '27 yrs', STAT4_LABEL: 'Teaching Since 1998',
+
+    PRINCIPAL_NAME: 'Dr. Anjali Mehra',
+    PRINCIPAL_TITLE: 'Principal',
+    PRINCIPAL_PHOTO: '',
+    PRINCIPAL_QUOTE: "We don't just prepare students for exams — we prepare them for the questions life hasn't asked them yet.",
+    PRINCIPAL_MESSAGE: 'At our school, we believe education is the balance of discipline and discovery. Our classrooms are built around inquiry, our playgrounds around character, and our corridors around community.',
+
+    SOCIAL_FACEBOOK: '', SOCIAL_INSTAGRAM: '', SOCIAL_YOUTUBE: '', SOCIAL_LINKEDIN: '',
+    FOOTER_CREDIT: 'Website by School IT Cell'
+  };
+  const existingRowCount = configSheet.getLastRow() - 1;
+  const existing = existingRowCount > 0 ? configSheet.getRange(2, 1, existingRowCount, 2).getValues() : [];
+  const existingKeys = existing.map(function (r) { return r[0]; });
+  Object.keys(defaults).forEach(function (k) {
+    if (existingKeys.indexOf(k) === -1) {
+      configSheet.appendRow([k, defaults[k]]);
+    }
+  });
+
+  Logger.log('Setup complete. Spreadsheet ID: ' + ssId + ' | Drive Folder ID: ' + folderId);
+  Logger.log('Default admin password is "ChangeMe123!" — change it via the admin panel Settings tab.');
+}
+
+function getSS_() {
+  return SpreadsheetApp.openById(PropertiesService.getScriptProperties().getProperty('SHEET_ID'));
+}
+function getSheet_(name) {
+  return getSS_().getSheetByName(name);
+}
+function getFolder_() {
+  return DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty('DRIVE_FOLDER_ID'));
+}
+
+/* ---------------------------------------------------------------
+ *  1. ENTRY POINTS
+ * --------------------------------------------------------------- */
+
+function doGet(e) {
+  const params = e.parameter || {};
+  const action = params.action || 'ping';
+  let result;
+  try {
+    result = dispatch_(action, params);
+  } catch (err) {
+    result = { ok: false, error: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Writes come in as a plain JSON string in the POST body (fetch() with
+ * Content-Type: text/plain — this avoids the CORS preflight that a
+ * Content-Type of application/json would trigger, while still letting
+ * us send an arbitrarily large body, e.g. base64 file data).
+ */
+function doPost(e) {
+  let payload = {};
+  try {
+    payload = JSON.parse((e.postData && e.postData.contents) || '{}');
+  } catch (err) {
+    payload = {};
+  }
+  const action = payload.action || 'ping';
+  let result;
+  try {
+    result = dispatch_(action, payload);
+  } catch (err) {
+    result = { ok: false, error: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Combines read + write routing. Both doGet and doPost use this,
+ * so any action can be reached either way.
+ */
+function dispatch_(action, p) {
+  const READ_ACTIONS = ['ping', 'getPublicConfig', 'getGallery', 'getNews', 'getNewsById', 'getVideos',
+    'getFeatured', 'getEvents', 'getEnquiries', 'getAllConfig', 'getStats', 'checkSession',
+    'getPrograms', 'getSteps', 'getAffiliations'];
+  if (READ_ACTIONS.indexOf(action) > -1) return routeRead_(action, p);
+  return routeWrite_(action, p);
+}
+
+function routeRead_(action, p) {
+  switch (action) {
+    case 'ping': return { ok: true, message: 'pong' };
+    case 'getPublicConfig': return getPublicConfig_();
+    case 'getGallery': return { ok: true, data: listRows_(SHEET_NAMES.GALLERY, p) };
+    case 'getNews': return { ok: true, data: listNews_(p) };
+    case 'getNewsById': return { ok: true, data: getRowById_(SHEET_NAMES.NEWS, p.id) };
+    case 'getVideos': return { ok: true, data: listRows_(SHEET_NAMES.VIDEOS, p) };
+    case 'getFeatured': return { ok: true, data: listFeatured_(p) };
+    case 'getEvents': return { ok: true, data: listRows_(SHEET_NAMES.EVENTS, p) };
+    case 'getPrograms': return { ok: true, data: listOrdered_(SHEET_NAMES.PROGRAMS) };
+    case 'getSteps': return { ok: true, data: listOrdered_(SHEET_NAMES.STEPS) };
+    case 'getAffiliations': return { ok: true, data: listOrdered_(SHEET_NAMES.AFFILIATIONS) };
+    case 'getEnquiries': return requireAuth_(p, function () { return { ok: true, data: listRows_(SHEET_NAMES.ENQUIRIES, p) }; });
+    case 'getAllConfig': return requireAuth_(p, function () { return { ok: true, data: getAllConfig_() }; });
+    case 'getStats': return requireAuth_(p, function () { return { ok: true, data: getStats_() }; });
+    case 'checkSession': return { ok: !!validateToken_(p.token) };
+    default: return { ok: false, error: 'Unknown action: ' + action };
+  }
+}
+
+function routeWrite_(action, p) {
+  switch (action) {
+    case 'ping': return { ok: true, message: 'pong' };
+    case 'login': return login_(p);
+    case 'logout': return logout_(p);
+    case 'changePassword': return requireAuth_(p, function () { return changePassword_(p); });
+
+    case 'createGallery': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.GALLERY, prepGallery_(p)); });
+    case 'updateGallery': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.GALLERY, p.id, prepGallery_(p)); });
+    case 'deleteGallery': return requireAuth_(p, function () { return deleteRowWithFile_(SHEET_NAMES.GALLERY, p.id); });
+
+    case 'createNews': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.NEWS, prepNews_(p)); });
+    case 'updateNews': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.NEWS, p.id, prepNews_(p)); });
+    case 'deleteNews': return requireAuth_(p, function () { return deleteRowWithFile_(SHEET_NAMES.NEWS, p.id); });
+    case 'incrementNewsViews': return incrementViews_(p.id);
+
+    case 'createVideo': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.VIDEOS, prepVideo_(p)); });
+    case 'updateVideo': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.VIDEOS, p.id, prepVideo_(p)); });
+    case 'deleteVideo': return requireAuth_(p, function () { return deleteRow_(SHEET_NAMES.VIDEOS, p.id); });
+
+    case 'createFeatured': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.FEATURED, prepFeatured_(p)); });
+    case 'updateFeatured': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.FEATURED, p.id, prepFeatured_(p)); });
+    case 'deleteFeatured': return requireAuth_(p, function () { return deleteRowWithFile_(SHEET_NAMES.FEATURED, p.id); });
+
+    case 'createEvent': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.EVENTS, prepEvent_(p)); });
+    case 'updateEvent': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.EVENTS, p.id, prepEvent_(p)); });
+    case 'deleteEvent': return requireAuth_(p, function () { return deleteRow_(SHEET_NAMES.EVENTS, p.id); });
+
+    case 'createProgram': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.PROGRAMS, prepProgram_(p)); });
+    case 'updateProgram': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.PROGRAMS, p.id, prepProgram_(p)); });
+    case 'deleteProgram': return requireAuth_(p, function () { return deleteRow_(SHEET_NAMES.PROGRAMS, p.id); });
+
+    case 'createStep': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.STEPS, prepStep_(p)); });
+    case 'updateStep': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.STEPS, p.id, prepStep_(p)); });
+    case 'deleteStep': return requireAuth_(p, function () { return deleteRow_(SHEET_NAMES.STEPS, p.id); });
+
+    case 'createAffiliation': return requireAuth_(p, function () { return createRow_(SHEET_NAMES.AFFILIATIONS, prepAffiliation_(p)); });
+    case 'updateAffiliation': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.AFFILIATIONS, p.id, prepAffiliation_(p)); });
+    case 'deleteAffiliation': return requireAuth_(p, function () { return deleteRowWithFile_(SHEET_NAMES.AFFILIATIONS, p.id); });
+
+    case 'submitEnquiry': return submitEnquiry_(p);
+    case 'updateEnquiryStatus': return requireAuth_(p, function () { return updateRow_(SHEET_NAMES.ENQUIRIES, p.id, { status: p.status }); });
+    case 'deleteEnquiry': return requireAuth_(p, function () { return deleteRow_(SHEET_NAMES.ENQUIRIES, p.id); });
+
+    case 'updateConfig': return requireAuth_(p, function () { return updateConfig_(p.values || {}); });
+    case 'uploadFile': return requireAuth_(p, function () { return uploadFile_(p); });
+    default: return { ok: false, error: 'Unknown action: ' + action };
+  }
+}
+
+/* ---------------------------------------------------------------
+ *  2. AUTH
+ * --------------------------------------------------------------- */
+
+function login_(p) {
+  const stored = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD');
+  if (String(p.password) !== String(stored)) {
+    return { ok: false, error: 'Incorrect password' };
+  }
+  const token = Utilities.getUuid();
+  CacheService.getScriptCache().put('session_' + token, 'valid', SESSION_TTL_SECONDS);
+  return { ok: true, token: token };
+}
+
+function logout_(p) {
+  CacheService.getScriptCache().remove('session_' + p.token);
+  return { ok: true };
+}
+
+function validateToken_(token) {
+  if (!token) return false;
+  return CacheService.getScriptCache().get('session_' + token) === 'valid';
+}
+
+function requireAuth_(p, fn) {
+  if (!validateToken_(p.token)) {
+    return { ok: false, error: 'Not authenticated', authError: true };
+  }
+  return fn();
+}
+
+function changePassword_(p) {
+  if (!p.newPassword || String(p.newPassword).length < 6) {
+    return { ok: false, error: 'Password must be at least 6 characters' };
+  }
+  PropertiesService.getScriptProperties().setProperty('ADMIN_PASSWORD', String(p.newPassword));
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------
+ *  3. GENERIC SHEET HELPERS
+ * --------------------------------------------------------------- */
+
+function sheetToObjects_(sheetName) {
+  const sh = getSheet_(sheetName);
+  const rows = sh.getDataRange().getValues();
+  const headers = rows.shift();
+  return rows
+    .map(function (r, i) {
+      const obj = {};
+      headers.forEach(function (h, idx) { obj[h] = r[idx]; });
+      obj._row = i + 2; // actual sheet row number
+      return obj;
+    })
+    .filter(function (o) { return o.id !== '' && o.id !== undefined && o.id !== null; });
+}
+
+function listRows_(sheetName, p) {
+  let rows = sheetToObjects_(sheetName).sort(sortNewestFirst_);
+  if (p && p.category) rows = rows.filter(function (r) { return String(r.category || '').toLowerCase() === String(p.category).toLowerCase(); });
+  return paginate_(rows, p);
+}
+
+function sortNewestFirst_(a, b) {
+  const ad = a.createdAt || a.date || a._row;
+  const bd = b.createdAt || b.date || b._row;
+  return new Date(bd) - new Date(ad);
+}
+
+function paginate_(rows, p) {
+  if (!p || !p.limit) return rows;
+  const page = parseInt(p.page || '1', 10);
+  const limit = parseInt(p.limit, 10);
+  const start = (page - 1) * limit;
+  return {
+    items: rows.slice(start, start + limit),
+    total: rows.length,
+    page: page,
+    limit: limit,
+    totalPages: Math.max(1, Math.ceil(rows.length / limit))
+  };
+}
+
+/** Simple sortOrder-ascending list, used for editorial/content modules */
+function listOrdered_(sheetName) {
+  return sheetToObjects_(sheetName).sort(function (a, b) { return (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0); });
+}
+
+function getRowById_(sheetName, id) {
+  const rows = sheetToObjects_(sheetName);
+  return rows.filter(function (r) { return String(r.id) === String(id); })[0] || null;
+}
+
+function createRow_(sheetName, data) {
+  const sh = getSheet_(sheetName);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const id = Utilities.getUuid();
+  data.id = id;
+  const row = headers.map(function (h) { return data[h] !== undefined ? data[h] : ''; });
+  sh.appendRow(row);
+  return { ok: true, id: id };
+}
+
+function updateRow_(sheetName, id, data) {
+  const sh = getSheet_(sheetName);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const values = sh.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(id)) {
+      headers.forEach(function (h, colIdx) {
+        if (data[h] !== undefined && h !== 'id') {
+          sh.getRange(i + 1, colIdx + 1).setValue(data[h]);
+        }
+      });
+      return { ok: true, id: id };
+    }
+  }
+  return { ok: false, error: 'Row not found' };
+}
+
+function deleteRow_(sheetName, id) {
+  const sh = getSheet_(sheetName);
+  const values = sh.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(id)) {
+      sh.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Row not found' };
+}
+
+/** Deletes the sheet row AND its associated Drive file (if any) */
+function deleteRowWithFile_(sheetName, id) {
+  const row = getRowById_(sheetName, id);
+  if (row) {
+    ['driveFileId', 'imageFileId', 'pdfFileId'].forEach(function (key) {
+      if (row[key]) {
+        try { DriveApp.getFileById(row[key]).setTrashed(true); } catch (e) { /* already gone */ }
+      }
+    });
+  }
+  return deleteRow_(sheetName, id);
+}
+
+/* ---------------------------------------------------------------
+ *  4. MODULE-SPECIFIC PREP / LOGIC
+ * --------------------------------------------------------------- */
+
+function prepGallery_(p) {
+  return {
+    title: p.title || '',
+    category: p.category || 'General',
+    imageUrl: p.imageUrl || '',
+    source: p.source || 'link',
+    driveFileId: p.driveFileId || '',
+    createdAt: p.createdAt || new Date().toISOString()
+  };
+}
+
+function prepNews_(p) {
+  return {
+    title: p.title || '',
+    summary: p.summary || '',
+    content: p.content || '',
+    imageUrl: p.imageUrl || '',
+    imageFileId: p.imageFileId || '',
+    pdfUrl: p.pdfUrl || '',
+    pdfFileId: p.pdfFileId || '',
+    category: p.category || 'General',
+    author: p.author || 'Admin',
+    date: p.date || new Date().toISOString(),
+    published: p.published === false || p.published === 'false' ? 'false' : 'true',
+    views: p.views || 0
+  };
+}
+
+function incrementViews_(id) {
+  const row = getRowById_(SHEET_NAMES.NEWS, id);
+  if (!row) return { ok: false };
+  return updateRow_(SHEET_NAMES.NEWS, id, { views: (Number(row.views) || 0) + 1 });
+}
+
+function listNews_(p) {
+  let rows = sheetToObjects_(SHEET_NAMES.NEWS).filter(function (r) { return String(r.published) !== 'false'; });
+  if (p.q) {
+    const q = String(p.q).toLowerCase();
+    rows = rows.filter(function (r) {
+      return String(r.title).toLowerCase().indexOf(q) > -1 ||
+        String(r.summary).toLowerCase().indexOf(q) > -1 ||
+        String(r.content).toLowerCase().indexOf(q) > -1;
+    });
+  }
+  if (p.category) rows = rows.filter(function (r) { return String(r.category).toLowerCase() === String(p.category).toLowerCase(); });
+  rows.sort(sortNewestFirst_);
+  return paginate_(rows, p);
+}
+
+function prepVideo_(p) {
+  return {
+    title: p.title || '',
+    youtubeUrl: normalizeYoutube_(p.youtubeUrl || ''),
+    category: p.category || 'General',
+    description: p.description || '',
+    date: p.date || new Date().toISOString()
+  };
+}
+
+function normalizeYoutube_(url) {
+  const m = String(url).match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : url;
+}
+
+function prepFeatured_(p) {
+  const type = p.type || 'photo';
+  return {
+    type: type,
+    url: type === 'video' ? normalizeYoutube_(p.url || '') : (p.url || ''),
+    driveFileId: p.driveFileId || '',
+    title: p.title || '',
+    caption: p.caption || '',
+    sortOrder: p.sortOrder || 0,
+    active: p.active === false || p.active === 'false' ? 'false' : 'true'
+  };
+}
+
+function listFeatured_(p) {
+  let rows = sheetToObjects_(SHEET_NAMES.FEATURED).filter(function (r) { return String(r.active) !== 'false'; });
+  rows.sort(function (a, b) { return (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0); });
+  return rows;
+}
+
+function prepEvent_(p) {
+  return {
+    title: p.title || '',
+    description: p.description || '',
+    date: p.date || '',
+    endDate: p.endDate || p.date || '',
+    time: p.time || '',
+    location: p.location || '',
+    category: p.category || 'General',
+    color: p.color || '#D4A24C'
+  };
+}
+
+function prepProgram_(p) {
+  return {
+    stage: p.stage || '', name: p.name || '', description: p.description || '',
+    tags: p.tags || '', sortOrder: p.sortOrder || 0
+  };
+}
+
+function prepStep_(p) {
+  return { title: p.title || '', description: p.description || '', sortOrder: p.sortOrder || 0 };
+}
+
+function prepAffiliation_(p) {
+  return {
+    name: p.name || '', imageUrl: p.imageUrl || '', driveFileId: p.driveFileId || '',
+    link: p.link || '', sortOrder: p.sortOrder || 0
+  };
+}
+
+function submitEnquiry_(p) {
+  if (!p.name || !p.email || !p.message) {
+    return { ok: false, error: 'Name, email and message are required' };
+  }
+  return createRow_(SHEET_NAMES.ENQUIRIES, {
+    name: p.name, email: p.email, phone: p.phone || '',
+    subject: p.subject || 'General Enquiry', message: p.message,
+    date: new Date().toISOString(), status: 'new'
+  });
+}
+
+/* ---------------------------------------------------------------
+ *  5. CONFIG (site settings / popup)
+ * --------------------------------------------------------------- */
+
+function getAllConfig_() {
+  const rows = getSheet_(SHEET_NAMES.CONFIG).getDataRange().getValues();
+  rows.shift();
+  const obj = {};
+  rows.forEach(function (r) { obj[r[0]] = r[1]; });
+  return obj;
+}
+
+function getPublicConfig_() {
+  const all = getAllConfig_();
+  return { ok: true, data: all };
+}
+
+function updateConfig_(values) {
+  const sh = getSheet_(SHEET_NAMES.CONFIG);
+  const rows = sh.getDataRange().getValues();
+  Object.keys(values).forEach(function (key) {
+    let found = false;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === key) {
+        sh.getRange(i + 1, 2).setValue(values[key]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) sh.appendRow([key, values[key]]);
+  });
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------
+ *  6. FILE UPLOAD (base64 -> Drive)
+ * --------------------------------------------------------------- */
+
+/**
+ * p.base64   : raw base64 (no data: prefix)
+ * p.mimeType : e.g. "image/jpeg", "application/pdf"
+ * p.fileName : original filename
+ * p.kind     : "image" | "pdf"  (enforces size limit)
+ */
+function uploadFile_(p) {
+  if (!p.base64 || !p.mimeType) return { ok: false, error: 'Missing file data' };
+
+  const bytes = Utilities.base64Decode(p.base64);
+  const sizeLimit = p.kind === 'pdf' ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
+  if (bytes.length > sizeLimit) {
+    return { ok: false, error: 'File exceeds size limit (' + Math.round(sizeLimit / 1024) + 'KB)' };
+  }
+  if (p.kind === 'pdf' && p.mimeType !== 'application/pdf') {
+    return { ok: false, error: 'Only PDF files are allowed here' };
+  }
+
+  const blob = Utilities.newBlob(bytes, p.mimeType, p.fileName || 'upload');
+  const file = getFolder_().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  const fileId = file.getId();
+  const url = p.kind === 'pdf'
+    ? 'https://drive.google.com/file/d/' + fileId + '/preview'
+    : 'https://lh3.googleusercontent.com/d/' + fileId;
+
+  return { ok: true, fileId: fileId, url: url };
+}
+
+/* ---------------------------------------------------------------
+ *  7. DASHBOARD STATS
+ * --------------------------------------------------------------- */
+
+function getStats_() {
+  return {
+    gallery: sheetToObjects_(SHEET_NAMES.GALLERY).length,
+    news: sheetToObjects_(SHEET_NAMES.NEWS).length,
+    videos: sheetToObjects_(SHEET_NAMES.VIDEOS).length,
+    events: sheetToObjects_(SHEET_NAMES.EVENTS).length,
+    enquiries: sheetToObjects_(SHEET_NAMES.ENQUIRIES).length,
+    newEnquiries: sheetToObjects_(SHEET_NAMES.ENQUIRIES).filter(function (r) { return r.status === 'new'; }).length,
+    programs: sheetToObjects_(SHEET_NAMES.PROGRAMS).length,
+    steps: sheetToObjects_(SHEET_NAMES.STEPS).length,
+    affiliations: sheetToObjects_(SHEET_NAMES.AFFILIATIONS).length
+  };
+}
