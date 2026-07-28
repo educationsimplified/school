@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — School Website</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#16233F; --navy-deep:#0D1526; --paper:#F4F5F7; --white:#fff;
+  --gold:#C9973F; --sage:#5F7A5E; --coral:#D65B3E; --ink:#20262F; --ink-soft:#6B7280;
+  --line:#E5E7EB; --radius:10px; --shadow:0 6px 20px rgba(15,23,42,.06);
+  --font:'Inter',sans-serif; --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;}
+body{margin:0; font-family:var(--font); background:var(--paper); color:var(--ink);}
+a{color:inherit; text-decoration:none;}
+button{font-family:var(--font); cursor:pointer;}
+img{max-width:100%;}
+
+/* ---------- LOGIN ---------- */
+#loginScreen{
+  position:fixed; inset:0; background:linear-gradient(160deg,var(--navy),var(--navy-deep));
+  display:flex; align-items:center; justify-content:center; z-index:500;
+}
+.login-card{background:var(--white); border-radius:16px; padding:40px 36px; width:100%; max-width:380px; box-shadow:0 30px 60px rgba(0,0,0,.35);}
+.login-card h1{font-size:20px; margin:0 0 4px;}
+.login-card p{color:var(--ink-soft); font-size:13.5px; margin:0 0 24px;}
+.login-card input{width:100%; padding:12px 14px; border:1.5px solid var(--line); border-radius:8px; margin-bottom:14px; font-size:14.5px;}
+.login-card button{width:100%; padding:12px; border-radius:8px; border:none; background:var(--navy); color:#fff; font-weight:600; font-size:14.5px;}
+.login-err{color:var(--coral); font-size:13px; margin-bottom:10px; display:none;}
+
+/* ---------- SHELL ---------- */
+#app{display:none;}
+.shell{display:grid; grid-template-columns:240px 1fr; min-height:100vh;}
+.sidebar{background:var(--navy-deep); color:#fff; padding:22px 16px; display:flex; flex-direction:column;}
+.sb-brand{display:flex; align-items:center; gap:10px; padding:0 10px 22px; font-weight:700; font-size:16px; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:16px;}
+.sb-item{
+  display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:8px; font-size:14px; font-weight:500;
+  color:rgba(255,255,255,.65); cursor:pointer; margin-bottom:2px;
+}
+.sb-item:hover{background:rgba(255,255,255,.06); color:#fff;}
+.sb-item.active{background:var(--gold); color:var(--navy-deep); font-weight:700;}
+.sb-icon{width:20px; text-align:center;}
+.sb-bottom{margin-top:auto; padding-top:14px; border-top:1px solid rgba(255,255,255,.1);}
+
+.main{padding:26px 32px; overflow-y:auto;}
+.topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;}
+.topbar h2{margin:0; font-size:22px;}
+.topbar .sub{color:var(--ink-soft); font-size:13.5px; margin-top:2px;}
+
+.cards-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:26px;}
+.stat-card{background:var(--white); border-radius:var(--radius); padding:18px 20px; box-shadow:var(--shadow);}
+.stat-card .num{font-size:28px; font-weight:700; font-family:var(--mono);}
+.stat-card .lbl{color:var(--ink-soft); font-size:12.5px; margin-top:4px; text-transform:uppercase; letter-spacing:.04em;}
+
+.panel{background:var(--white); border-radius:var(--radius); box-shadow:var(--shadow); padding:22px; margin-bottom:20px;}
+.panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px;}
+.panel-head h3{margin:0; font-size:16.5px;}
+
+.btn{display:inline-flex; align-items:center; gap:7px; padding:10px 18px; border-radius:8px; border:none; font-size:13.5px; font-weight:600; cursor:pointer;}
+.btn-primary{background:var(--navy); color:#fff;}
+.btn-primary:hover{background:var(--navy-deep);}
+.btn-gold{background:var(--gold); color:var(--navy-deep);}
+.btn-ghost{background:var(--paper); color:var(--ink);}
+.btn-danger{background:#fde8e4; color:var(--coral);}
+.btn-sm{padding:6px 12px; font-size:12.5px;}
+
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+th{text-align:left; padding:10px 12px; color:var(--ink-soft); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; border-bottom:1.5px solid var(--line);}
+td{padding:12px; border-bottom:1px solid var(--line); vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.thumb-sm{width:44px; height:44px; border-radius:6px; object-fit:cover; background:var(--paper);}
+.badge{display:inline-block; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:600;}
+.badge-new{background:#fde8e4; color:var(--coral);}
+.badge-read{background:#e8ecf5; color:var(--navy);}
+.badge-responded{background:#e5f0e4; color:var(--sage);}
+.badge-pub{background:#e5f0e4; color:var(--sage);}
+.badge-draft{background:#f1eee0; color:var(--gold);}
+.row-actions{display:flex; gap:8px;}
+.empty-row{text-align:center; color:var(--ink-soft); padding:30px;}
+
+.toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+.toolbar input, .toolbar select{padding:9px 12px; border:1.5px solid var(--line); border-radius:8px; font-size:13.5px; font-family:var(--font);}
+
+/* ---------- MODAL ---------- */
+.modal-overlay{position:fixed; inset:0; background:rgba(13,21,38,.55); display:none; align-items:center; justify-content:center; z-index:400; padding:20px;}
+.modal-overlay.active{display:flex;}
+.modal{background:#fff; border-radius:14px; width:100%; max-width:560px; max-height:88vh; overflow-y:auto; box-shadow:0 30px 60px rgba(0,0,0,.3);}
+.modal-head{display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid var(--line);}
+.modal-head h3{margin:0; font-size:17px;}
+.modal-close{background:none; border:none; font-size:22px; color:var(--ink-soft); cursor:pointer;}
+.modal-body{padding:22px 24px; display:flex; flex-direction:column; gap:14px;}
+.field label{display:block; font-size:12.5px; font-weight:600; margin-bottom:6px; color:var(--ink-soft);}
+.field input,.field select,.field textarea{
+  width:100%; padding:11px 13px; border:1.5px solid var(--line); border-radius:8px; font-size:14px; font-family:var(--font);
+}
+.field textarea{min-height:90px; resize:vertical;}
+.field-row{display:flex; gap:12px;}
+.field-row > *{flex:1;}
+.upload-toggle{display:flex; gap:8px; margin-bottom:6px;}
+.upload-toggle button{flex:1; padding:8px; border-radius:8px; border:1.5px solid var(--line); background:var(--paper); font-size:12.5px; font-weight:600;}
+.upload-toggle button.active{background:var(--navy); color:#fff; border-color:var(--navy);}
+.file-hint{font-size:11.5px; color:var(--ink-soft); margin-top:4px;}
+.modal-foot{padding:16px 24px; border-top:1px solid var(--line); display:flex; justify-content:flex-end; gap:10px;}
+.toast{position:fixed; bottom:24px; right:24px; background:var(--navy-deep); color:#fff; padding:14px 20px; border-radius:10px; font-size:13.5px; box-shadow:var(--shadow); z-index:600; display:none;}
+.toast.err{background:var(--coral);}
+.preview-img{max-height:120px; border-radius:8px; margin-top:6px; display:none;}
+
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .main{padding:18px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>Admin Sign In</h1>
+    <p>School Website Control Panel</p>
+    <div class="login-err" id="loginErr"></div>
+    <input type="password" id="loginPassword" placeholder="Admin password">
+    <button id="loginBtn">Sign In</button>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="app">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sb-brand">🏫 <span>Admin Panel</span></div>
+      <div class="sb-item active" data-view="dashboard"><span class="sb-icon">📊</span>Dashboard</div>
+      <div class="sb-item" data-view="gallery"><span class="sb-icon">🖼️</span>Gallery</div>
+      <div class="sb-item" data-view="news"><span class="sb-icon">📰</span>News</div>
+      <div class="sb-item" data-view="videos"><span class="sb-icon">🎬</span>Videos</div>
+      <div class="sb-item" data-view="featured"><span class="sb-icon">⭐</span>Featured Media</div>
+      <div class="sb-item" data-view="events"><span class="sb-icon">📅</span>Calendar</div>
+      <div class="sb-item" data-view="programs"><span class="sb-icon">🎓</span>Programs</div>
+      <div class="sb-item" data-view="steps"><span class="sb-icon">🧭</span>Admission Steps</div>
+      <div class="sb-item" data-view="affiliations"><span class="sb-icon">🏵️</span>Affiliations</div>
+      <div class="sb-item" data-view="enquiries"><span class="sb-icon">✉️</span>Enquiries</div>
+      <div class="sb-item" data-view="settings"><span class="sb-icon">⚙️</span>Settings</div>
+      <div class="sb-bottom">
+        <div class="sb-item" id="logoutBtn"><span class="sb-icon">🚪</span>Log Out</div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <div><h2 id="viewTitle">Dashboard</h2><div class="sub" id="viewSub">Overview of your website</div></div>
+      </div>
+      <div id="viewContent"></div>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ================= MODAL (shared) ================= -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">Add Item</h3><button class="modal-close" id="modalClose">&times;</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="modalCancel">Cancel</button>
+      <button class="btn btn-primary" id="modalSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG
+   ========================================================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycbxt5gh3o2xSeUT-KQEpZ60zh9hkovHB9wy7cGWn_qh0-8o4mpgXhAjiQJouJbOZrzZb/exec';
+let TOKEN = sessionStorage.getItem('admin_token') || '';
+
+/* ---------- JSONP GET ---------- */
+let jsonpCounter = 0;
+function apiGet(action, params) {
+  return new Promise(function (resolve, reject) {
+    const cbName = 'jsonp_cb_' + (jsonpCounter++);
+    const query = Object.assign({ action: action, callback: cbName, token: TOKEN }, params || {});
+    const qs = Object.keys(query).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(query[k] == null ? '' : query[k]); }).join('&');
+    const script = document.createElement('script');
+    window[cbName] = function (data) { resolve(data); delete window[cbName]; script.remove(); };
+    script.src = API_URL + '?' + qs;
+    script.onerror = function () { reject(new Error('Network error')); delete window[cbName]; };
+    document.body.appendChild(script);
+  });
+}
+
+/* ---------- Hidden-iframe POST (writes) ---------- */
+function apiPost(action, payload) {
+  return new Promise(function (resolve) {
+    const iframeName = 'post_frame_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+    function handler(e) {
+      window.removeEventListener('message', handler);
+      resolve(e.data);
+      setTimeout(function () { iframe.remove(); }, 400);
+    }
+    window.addEventListener('message', handler);
+    const form = document.createElement('form');
+    form.method = 'POST'; form.action = API_URL; form.target = iframeName; form.style.display = 'none';
+    const input = document.createElement('input');
+    input.name = 'payload';
+    input.value = JSON.stringify(Object.assign({ action: action, token: TOKEN }, payload));
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
+  });
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+function fmtDate(d) { const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function toast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast' + (isErr ? ' err' : '');
+  t.style.display = 'block';
+  setTimeout(function () { t.style.display = 'none'; }, 3000);
+}
+function fileToBase64(file) {
+  return new Promise(function (resolve, reject) {
+    const r = new FileReader();
+    r.onload = function () { resolve(r.result.split(',')[1]); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+/* =========================================================
+   AUTH
+   ========================================================= */
+function showLogin() { document.getElementById('loginScreen').style.display = 'flex'; document.getElementById('app').style.display = 'none'; }
+function showApp() { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('app').style.display = 'block'; renderView('dashboard'); }
+
+document.getElementById('loginBtn').onclick = function () { doLogin(); };
+document.getElementById('loginPassword').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+function doLogin() {
+  const pw = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn');
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  apiPost('login', { password: pw }).then(function (res) {
+    btn.textContent = 'Sign In'; btn.disabled = false;
+    if (res && res.ok) {
+      TOKEN = res.token;
+      sessionStorage.setItem('admin_token', TOKEN);
+      showApp();
+    } else {
+      document.getElementById('loginErr').style.display = 'block';
+      document.getElementById('loginErr').textContent = (res && res.error) || 'Login failed';
+    }
+  });
+}
+document.getElementById('logoutBtn').onclick = function () {
+  apiPost('logout', {});
+  sessionStorage.removeItem('admin_token');
+  TOKEN = '';
+  showLogin();
+};
+
+(function initAuth() {
+  if (!TOKEN) { showLogin(); return; }
+  apiGet('checkSession', {}).then(function (res) {
+    if (res && res.ok) showApp(); else showLogin();
+  });
+})();
+
+/* =========================================================
+   SIDEBAR / ROUTING
+   ========================================================= */
+document.querySelectorAll('.sb-item[data-view]').forEach(function (item) {
+  item.onclick = function () {
+    document.querySelectorAll('.sb-item[data-view]').forEach(function (i) { i.classList.remove('active'); });
+    item.classList.add('active');
+    renderView(item.dataset.view);
+  };
+});
+
+const VIEW_META = {
+  dashboard: ['Dashboard', 'Overview of your website'],
+  gallery: ['Gallery', 'Manage photo gallery items'],
+  news: ['News', 'Publish and manage news posts'],
+  videos: ['Videos', 'Manage YouTube video listings'],
+  featured: ['Featured Media', 'Curate the homepage spotlight strip'],
+  events: ['Calendar', 'Manage school events and key dates'],
+  programs: ['Programs', 'Academic programs shown on the homepage'],
+  steps: ['Admission Steps', 'The step-by-step admissions process shown on the homepage'],
+  affiliations: ['Affiliations', 'Board/council logos shown in the homepage marquee'],
+  enquiries: ['Enquiries', 'Messages from the enquiry form'],
+  settings: ['Settings', 'Site-wide configuration']
+};
+
+function renderView(view) {
+  document.getElementById('viewTitle').textContent = VIEW_META[view][0];
+  document.getElementById('viewSub').textContent = VIEW_META[view][1];
+  const c = document.getElementById('viewContent');
+  c.innerHTML = '<div class="panel">Loading…</div>';
+  ({
+    dashboard: renderDashboard, gallery: renderGallery, news: renderNews, videos: renderVideos,
+    featured: renderFeatured, events: renderEvents, programs: renderPrograms, steps: renderSteps,
+    affiliations: renderAffiliations, enquiries: renderEnquiries, settings: renderSettings
+  })[view](c);
+}
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+function renderDashboard(c) {
+  apiGet('getStats', {}).then(function (res) {
+    if (!res.ok) { c.innerHTML = '<div class="panel">Failed to load stats.</div>'; return; }
+    const s = res.data;
+    c.innerHTML =
+      '<div class="cards-row">' +
+      statCard(s.gallery, 'Gallery Items') + statCard(s.news, 'News Posts') + statCard(s.videos, 'Videos') +
+      statCard(s.events, 'Events') + statCard(s.enquiries, 'Total Enquiries') + statCard(s.newEnquiries, 'New Enquiries') +
+      statCard(s.programs, 'Programs') + statCard(s.steps, 'Admission Steps') + statCard(s.affiliations, 'Affiliations') +
+      '</div>' +
+      '<div class="panel"><h3 style="margin-top:0;">Quick tips</h3>' +
+      '<p style="color:var(--ink-soft);font-size:13.5px;line-height:1.7;">' +
+      'Use <strong>Settings</strong> to turn on the homepage popup announcement and update contact details. ' +
+      'New enquiries appear under <strong>Enquiries</strong> — mark them as read or responded once handled. ' +
+      'PDF uploads in News are capped at 1&nbsp;MB; images are capped at 4&nbsp;MB.</p></div>';
+  });
+}
+function statCard(num, lbl) { return '<div class="stat-card"><div class="num">' + num + '</div><div class="lbl">' + lbl + '</div></div>'; }
+
+/* =========================================================
+   GENERIC TABLE PANEL BUILDER
+   ========================================================= */
+function panelShell(title, addLabel, extraToolbar) {
+  return '<div class="panel"><div class="panel-head"><h3>' + title + '</h3>' +
+    '<div class="toolbar">' + (extraToolbar || '') + '<button class="btn btn-primary" id="addBtn">+ ' + addLabel + '</button></div></div>' +
+    '<div id="tableWrap"><div class="empty-row">Loading…</div></div></div>';
+}
+
+/* =========================================================
+   GALLERY
+   ========================================================= */
+function renderGallery(c) {
+  c.innerHTML = panelShell('Gallery Items', 'Add Photo');
+  document.getElementById('addBtn').onclick = function () { openGalleryModal(); };
+  loadGalleryTable();
+}
+function loadGalleryTable() {
+  apiGet('getGallery', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data;
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No gallery items yet — click "Add Photo" to get started.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th></th><th>Title</th><th>Category</th><th>Source</th><th>Added</th><th></th></tr></thead><tbody>' +
+      rows.map(function (g) {
+        return '<tr><td><img class="thumb-sm" src="' + esc(g.imageUrl) + '"></td><td>' + esc(g.title) + '</td><td>' + esc(g.category) +
+          '</td><td>' + esc(g.source) + '</td><td>' + fmtDate(g.createdAt) + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + g.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + g.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openGalleryModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteGallery', b.dataset.del, loadGalleryTable); }; });
+  });
+}
+function openGalleryModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Photo' : 'Add Photo', function (body) {
+    body.innerHTML =
+      field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
+      field('Category', '<input id="f_category" value="' + esc(item ? item.category : 'General') + '">') +
+      '<div class="field"><label>Image Source</label><div class="upload-toggle">' +
+      '<button type="button" class="active" id="srcLinkBtn">Paste Link</button>' +
+      '<button type="button" id="srcUploadBtn">Upload File</button></div>' +
+      '<input id="f_link" placeholder="https://…" value="' + esc(item && item.source !== 'upload' ? item.imageUrl : '') + '">' +
+      '<input id="f_file" type="file" accept="image/*" style="display:none;">' +
+      '<div class="file-hint">Direct uploads are stored in Google Drive automatically. Max 4MB.</div>' +
+      '<img id="f_preview" class="preview-img" src="' + (item ? esc(item.imageUrl) : '') + '" style="' + (item ? 'display:block;' : '') + '"></div>';
+    let mode = item && item.source === 'upload' ? 'upload' : 'link';
+    const linkBtn = body.querySelector('#srcLinkBtn'), uploadBtn = body.querySelector('#srcUploadBtn');
+    const linkInput = body.querySelector('#f_link'), fileInput = body.querySelector('#f_file');
+    function syncMode() {
+      linkBtn.classList.toggle('active', mode === 'link');
+      uploadBtn.classList.toggle('active', mode === 'upload');
+      linkInput.style.display = mode === 'link' ? 'block' : 'none';
+      fileInput.style.display = mode === 'upload' ? 'block' : 'none';
+    }
+    linkBtn.onclick = function () { mode = 'link'; syncMode(); };
+    uploadBtn.onclick = function () { mode = 'upload'; syncMode(); };
+    syncMode();
+    fileInput.onchange = function () {
+      const f = fileInput.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { body.querySelector('#f_preview').src = r.result; body.querySelector('#f_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+    };
+    body._getPayload = async function () {
+      const title = body.querySelector('#f_title').value.trim();
+      const category = body.querySelector('#f_category').value.trim() || 'General';
+      if (!title) { toast('Title is required', true); return null; }
+      if (mode === 'link') {
+        const url = linkInput.value.trim();
+        if (!url) { toast('Please paste an image link', true); return null; }
+        return { title: title, category: category, imageUrl: url, source: 'link', driveFileId: '' };
+      } else {
+        const f = fileInput.files[0];
+        if (!f && !item) { toast('Please choose a file', true); return null; }
+        if (!f) return { title: title, category: category, imageUrl: item.imageUrl, source: item.source, driveFileId: item.driveFileId };
+        if (f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
+        const base64 = await fileToBase64(f);
+        const up = await apiPost('uploadFile', { base64: base64, mimeType: f.type, fileName: f.name, kind: 'image' });
+        if (!up || !up.ok) { toast((up && up.error) || 'Upload failed', true); return null; }
+        return { title: title, category: category, imageUrl: up.url, source: 'upload', driveFileId: up.fileId };
+      }
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateGallery' : 'createGallery', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadGalleryTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   NEWS
+   ========================================================= */
+function renderNews(c) {
+  c.innerHTML = panelShell('News Posts', 'Add News');
+  document.getElementById('addBtn').onclick = function () { openNewsModal(); };
+  loadNewsTable();
+}
+function loadNewsTable() {
+  apiGet('getNews', { limit: 999 }).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data.items;
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No news posts yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th></th><th>Title</th><th>Category</th><th>Date</th><th>Status</th><th>Attachments</th><th></th></tr></thead><tbody>' +
+      rows.map(function (n) {
+        return '<tr><td><img class="thumb-sm" src="' + esc(n.imageUrl) + '"></td><td>' + esc(n.title) + '</td><td>' + esc(n.category) +
+          '</td><td>' + fmtDate(n.date) + '</td><td><span class="badge ' + (String(n.published) === 'false' ? 'badge-draft' : 'badge-pub') + '">' +
+          (String(n.published) === 'false' ? 'Draft' : 'Published') + '</span></td>' +
+          '<td>' + (n.pdfUrl ? '📄 PDF' : '—') + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + n.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + n.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openNewsModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteNews', b.dataset.del, loadNewsTable); }; });
+  });
+}
+function openNewsModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit News Post' : 'Add News Post', function (body) {
+    body.innerHTML =
+      field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
+      field('Summary (shown on card)', '<textarea id="f_summary" style="min-height:60px;">' + esc(item ? item.summary : '') + '</textarea>') +
+      field('Full Content', '<textarea id="f_content" style="min-height:120px;">' + esc(item ? item.content : '') + '</textarea>') +
+      '<div class="field-row">' + field('Category', '<input id="f_category" value="' + esc(item ? item.category : 'General') + '">') +
+      field('Author', '<input id="f_author" value="' + esc(item ? item.author : 'Admin') + '">') + '</div>' +
+      '<div class="field"><label>Cover Image (optional)</label><input id="f_img_file" type="file" accept="image/*">' +
+      '<div class="file-hint">Max 4MB.</div><img id="f_img_preview" class="preview-img" src="' + (item ? esc(item.imageUrl) : '') + '" style="' + (item && item.imageUrl ? 'display:block;' : '') + '"></div>' +
+      '<div class="field"><label>PDF Attachment (optional)</label><input id="f_pdf_file" type="file" accept="application/pdf">' +
+      '<div class="file-hint">Max 1MB, PDF only.</div><div id="f_pdf_name" style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">' + (item && item.pdfUrl ? '📄 Existing PDF attached' : '') + '</div></div>' +
+      field('Status', '<select id="f_pub"><option value="true"' + (!item || String(item.published) !== 'false' ? ' selected' : '') + '>Published</option><option value="false"' + (item && String(item.published) === 'false' ? ' selected' : '') + '>Draft</option></select>');
+    body.querySelector('#f_img_file').onchange = function () {
+      const f = this.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { body.querySelector('#f_img_preview').src = r.result; body.querySelector('#f_img_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+    };
+    body.querySelector('#f_pdf_file').onchange = function () {
+      const f = this.files[0];
+      if (f) body.querySelector('#f_pdf_name').textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+    };
+    body._getPayload = async function () {
+      const title = body.querySelector('#f_title').value.trim();
+      if (!title) { toast('Title is required', true); return null; }
+      const payload = {
+        title: title, summary: body.querySelector('#f_summary').value.trim(),
+        content: body.querySelector('#f_content').value.trim(),
+        category: body.querySelector('#f_category').value.trim() || 'General',
+        author: body.querySelector('#f_author').value.trim() || 'Admin',
+        published: body.querySelector('#f_pub').value,
+        imageUrl: item ? item.imageUrl : '', imageFileId: item ? item.imageFileId : '',
+        pdfUrl: item ? item.pdfUrl : '', pdfFileId: item ? item.pdfFileId : '',
+        date: item ? item.date : new Date().toISOString()
+      };
+      const imgFile = body.querySelector('#f_img_file').files[0];
+      if (imgFile) {
+        if (imgFile.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
+        const b64 = await fileToBase64(imgFile);
+        const up = await apiPost('uploadFile', { base64: b64, mimeType: imgFile.type, fileName: imgFile.name, kind: 'image' });
+        if (!up || !up.ok) { toast((up && up.error) || 'Image upload failed', true); return null; }
+        payload.imageUrl = up.url; payload.imageFileId = up.fileId;
+      }
+      const pdfFile = body.querySelector('#f_pdf_file').files[0];
+      if (pdfFile) {
+        if (pdfFile.type !== 'application/pdf') { toast('Attachment must be a PDF', true); return null; }
+        if (pdfFile.size > 1024 * 1024) { toast('PDF exceeds 1MB limit', true); return null; }
+        const b64 = await fileToBase64(pdfFile);
+        const up = await apiPost('uploadFile', { base64: b64, mimeType: pdfFile.type, fileName: pdfFile.name, kind: 'pdf' });
+        if (!up || !up.ok) { toast((up && up.error) || 'PDF upload failed', true); return null; }
+        payload.pdfUrl = up.url; payload.pdfFileId = up.fileId;
+      }
+      return payload;
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateNews' : 'createNews', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadNewsTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   VIDEOS
+   ========================================================= */
+function renderVideos(c) {
+  c.innerHTML = panelShell('Videos', 'Add Video');
+  document.getElementById('addBtn').onclick = function () { openVideoModal(); };
+  loadVideosTable();
+}
+function loadVideosTable() {
+  apiGet('getVideos', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data;
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No videos yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th>Title</th><th>YouTube ID</th><th>Category</th><th>Date</th><th></th></tr></thead><tbody>' +
+      rows.map(function (v) {
+        return '<tr><td>' + esc(v.title) + '</td><td><code>' + esc(v.youtubeUrl) + '</code></td><td>' + esc(v.category) + '</td><td>' + fmtDate(v.date) + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + v.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + v.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openVideoModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteVideo', b.dataset.del, loadVideosTable); }; });
+  });
+}
+function openVideoModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Video' : 'Add Video', function (body) {
+    body.innerHTML =
+      field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
+      field('YouTube Link', '<input id="f_url" placeholder="https://youtu.be/…" value="' + esc(item ? item.youtubeUrl : '') + '">') +
+      field('Category', '<input id="f_category" value="' + esc(item ? item.category : 'General') + '">') +
+      field('Description', '<textarea id="f_desc">' + esc(item ? item.description : '') + '</textarea>');
+    body._getPayload = async function () {
+      const title = body.querySelector('#f_title').value.trim();
+      const url = body.querySelector('#f_url').value.trim();
+      if (!title || !url) { toast('Title and YouTube link are required', true); return null; }
+      return { title: title, youtubeUrl: url, category: body.querySelector('#f_category').value.trim() || 'General', description: body.querySelector('#f_desc').value.trim() };
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateVideo' : 'createVideo', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadVideosTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   FEATURED MEDIA
+   ========================================================= */
+function renderFeatured(c) {
+  c.innerHTML = panelShell('Featured Media', 'Add Featured Item');
+  document.getElementById('addBtn').onclick = function () { openFeaturedModal(); };
+  loadFeaturedTable();
+}
+function loadFeaturedTable() {
+  apiGet('getFeatured', {}).then(function (rows) {
+    const wrap = document.getElementById('tableWrap');
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">Nothing featured yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th></th><th>Title</th><th>Type</th><th>Order</th><th>Active</th><th></th></tr></thead><tbody>' +
+      rows.map(function (f) {
+        return '<tr><td>' + (f.type === 'video' ? '🎬' : '<img class="thumb-sm" src="' + esc(f.url) + '">') + '</td><td>' + esc(f.title) +
+          '</td><td>' + esc(f.type) + '</td><td>' + esc(f.sortOrder) + '</td><td>' + (String(f.active) !== 'false' ? 'Yes' : 'No') + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + f.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + f.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openFeaturedModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteFeatured', b.dataset.del, loadFeaturedTable); }; });
+  });
+}
+function openFeaturedModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Featured Item' : 'Add Featured Item', function (body) {
+    body.innerHTML =
+      field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
+      field('Caption', '<input id="f_caption" value="' + esc(item ? item.caption : '') + '">') +
+      field('Type', '<select id="f_type"><option value="photo"' + (!item || item.type === 'photo' ? ' selected' : '') + '>Photo</option><option value="video"' + (item && item.type === 'video' ? ' selected' : '') + '>Video</option></select>') +
+      '<div class="field"><label>File (Photo or Video)</label><input id="f_file" type="file" accept="image/*,video/*">' +
+      '<div class="file-hint">Images up to 4MB. Videos: keep short clips, hosting is Drive-based.</div></div>' +
+      field('Display Order', '<input id="f_order" type="number" value="' + (item ? item.sortOrder : 0) + '">');
+    body._getPayload = async function () {
+      const title = body.querySelector('#f_title').value.trim();
+      if (!title) { toast('Title is required', true); return null; }
+      const payload = {
+        title: title, caption: body.querySelector('#f_caption').value.trim(),
+        type: body.querySelector('#f_type').value, sortOrder: body.querySelector('#f_order').value,
+        url: item ? item.url : '', driveFileId: item ? item.driveFileId : '', active: true
+      };
+      const f = body.querySelector('#f_file').files[0];
+      if (f) {
+        const kind = f.type.startsWith('video') ? 'video' : 'image';
+        if (kind === 'image' && f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
+        const b64 = await fileToBase64(f);
+        const up = await apiPost('uploadFile', { base64: b64, mimeType: f.type, fileName: f.name, kind: 'image' });
+        if (!up || !up.ok) { toast((up && up.error) || 'Upload failed', true); return null; }
+        payload.url = up.url; payload.driveFileId = up.fileId;
+      } else if (!item) { toast('Please choose a file', true); return null; }
+      return payload;
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateFeatured' : 'createFeatured', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadFeaturedTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   EVENTS / CALENDAR
+   ========================================================= */
+function renderEvents(c) {
+  c.innerHTML = panelShell('Events', 'Add Event');
+  document.getElementById('addBtn').onclick = function () { openEventModal(); };
+  loadEventsTable();
+}
+function loadEventsTable() {
+  apiGet('getEvents', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data.slice().sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No events yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th>Title</th><th>Date</th><th>Time</th><th>Location</th><th>Category</th><th></th></tr></thead><tbody>' +
+      rows.map(function (e) {
+        return '<tr><td>' + esc(e.title) + '</td><td>' + fmtDate(e.date) + '</td><td>' + esc(e.time) + '</td><td>' + esc(e.location) + '</td><td>' + esc(e.category) + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + e.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + e.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openEventModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteEvent', b.dataset.del, loadEventsTable); }; });
+  });
+}
+function openEventModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Event' : 'Add Event', function (body) {
+    body.innerHTML =
+      field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
+      field('Description', '<textarea id="f_desc">' + esc(item ? item.description : '') + '</textarea>') +
+      '<div class="field-row">' + field('Date', '<input id="f_date" type="date" value="' + (item ? String(item.date).slice(0, 10) : '') + '">') +
+      field('Time', '<input id="f_time" type="time" value="' + esc(item ? item.time : '') + '">') + '</div>' +
+      '<div class="field-row">' + field('Location', '<input id="f_loc" value="' + esc(item ? item.location : '') + '">') +
+      field('Category', '<input id="f_cat" value="' + esc(item ? item.category : 'General') + '">') + '</div>';
+    body._getPayload = async function () {
+      const title = body.querySelector('#f_title').value.trim();
+      const date = body.querySelector('#f_date').value;
+      if (!title || !date) { toast('Title and date are required', true); return null; }
+      return {
+        title: title, description: body.querySelector('#f_desc').value.trim(), date: date, endDate: date,
+        time: body.querySelector('#f_time').value, location: body.querySelector('#f_loc').value.trim(),
+        category: body.querySelector('#f_cat').value.trim() || 'General'
+      };
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateEvent' : 'createEvent', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadEventsTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   PROGRAMS
+   ========================================================= */
+function renderPrograms(c) {
+  c.innerHTML = panelShell('Academic Programs', 'Add Program');
+  document.getElementById('addBtn').onclick = function () { openProgramModal(); };
+  loadProgramsTable();
+}
+function loadProgramsTable() {
+  apiGet('getPrograms', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data;
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No programs yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th>Order</th><th>Stage</th><th>Name</th><th>Tags</th><th></th></tr></thead><tbody>' +
+      rows.map(function (p) {
+        return '<tr><td>' + esc(p.sortOrder) + '</td><td>' + esc(p.stage) + '</td><td>' + esc(p.name) + '</td><td>' + esc(p.tags) + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + p.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + p.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openProgramModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteProgram', b.dataset.del, loadProgramsTable); }; });
+  });
+}
+function openProgramModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Program' : 'Add Program', function (body) {
+    body.innerHTML =
+      '<div class="field-row">' + field('Stage (e.g. Grades 1–5)', '<input id="f_stage" value="' + esc(item ? item.stage : '') + '">') +
+      field('Display Order', '<input id="f_order" type="number" value="' + (item ? item.sortOrder : 0) + '">') + '</div>' +
+      field('Program Name', '<input id="f_name" value="' + esc(item ? item.name : '') + '">') +
+      field('Description', '<textarea id="f_desc">' + esc(item ? item.description : '') + '</textarea>') +
+      field('Tags (comma separated)', '<input id="f_tags" placeholder="e.g. STEM Labs, CBSE" value="' + esc(item ? item.tags : '') + '">');
+    body._getPayload = async function () {
+      const name = body.querySelector('#f_name').value.trim();
+      if (!name) { toast('Program name is required', true); return null; }
+      return {
+        stage: body.querySelector('#f_stage').value.trim(), name: name,
+        description: body.querySelector('#f_desc').value.trim(),
+        tags: body.querySelector('#f_tags').value.trim(), sortOrder: body.querySelector('#f_order').value
+      };
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateProgram' : 'createProgram', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadProgramsTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   ADMISSION STEPS
+   ========================================================= */
+function renderSteps(c) {
+  c.innerHTML = panelShell('Admission Steps', 'Add Step');
+  document.getElementById('addBtn').onclick = function () { openStepModal(); };
+  loadStepsTable();
+}
+function loadStepsTable() {
+  apiGet('getSteps', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data;
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No steps yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th>Order</th><th>Title</th><th>Description</th><th></th></tr></thead><tbody>' +
+      rows.map(function (s) {
+        return '<tr><td>' + esc(s.sortOrder) + '</td><td>' + esc(s.title) + '</td><td>' + esc(String(s.description).slice(0, 80)) + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + s.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + s.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openStepModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteStep', b.dataset.del, loadStepsTable); }; });
+  });
+}
+function openStepModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Step' : 'Add Step', function (body) {
+    body.innerHTML =
+      '<div class="field-row">' + field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
+      field('Display Order', '<input id="f_order" type="number" value="' + (item ? item.sortOrder : 0) + '">') + '</div>' +
+      field('Description', '<textarea id="f_desc">' + esc(item ? item.description : '') + '</textarea>');
+    body._getPayload = async function () {
+      const title = body.querySelector('#f_title').value.trim();
+      if (!title) { toast('Title is required', true); return null; }
+      return { title: title, description: body.querySelector('#f_desc').value.trim(), sortOrder: body.querySelector('#f_order').value };
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateStep' : 'createStep', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadStepsTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   AFFILIATIONS
+   ========================================================= */
+function renderAffiliations(c) {
+  c.innerHTML = panelShell('Affiliations', 'Add Logo');
+  document.getElementById('addBtn').onclick = function () { openAffiliationModal(); };
+  loadAffiliationsTable();
+}
+function loadAffiliationsTable() {
+  apiGet('getAffiliations', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data;
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No affiliation logos yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th></th><th>Name</th><th>Order</th><th>Link</th><th></th></tr></thead><tbody>' +
+      rows.map(function (a) {
+        return '<tr><td><img class="thumb-sm" src="' + esc(a.imageUrl) + '"></td><td>' + esc(a.name) + '</td><td>' + esc(a.sortOrder) + '</td><td>' + (a.link ? '🔗' : '—') + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-ghost" data-edit="' + a.id + '">Edit</button>' +
+          '<button class="btn btn-sm btn-danger" data-del="' + a.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-edit]').forEach(function (b) { b.onclick = function () { openAffiliationModal(rows.find(function (r) { return r.id === b.dataset.edit; })); }; });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteAffiliation', b.dataset.del, loadAffiliationsTable); }; });
+  });
+}
+function openAffiliationModal(item) {
+  const isEdit = !!item;
+  openModal(isEdit ? 'Edit Affiliation' : 'Add Affiliation Logo', function (body) {
+    body.innerHTML =
+      field('Name', '<input id="f_name" value="' + esc(item ? item.name : '') + '">') +
+      field('Link (optional)', '<input id="f_link" placeholder="https://…" value="' + esc(item ? item.link : '') + '">') +
+      '<div class="field"><label>Logo Image</label><input id="f_file" type="file" accept="image/*">' +
+      '<div class="file-hint">Transparent PNG works best. Max 4MB.</div>' +
+      '<img id="f_preview" class="preview-img" src="' + (item ? esc(item.imageUrl) : '') + '" style="' + (item ? 'display:block;' : '') + '"></div>' +
+      field('Display Order', '<input id="f_order" type="number" value="' + (item ? item.sortOrder : 0) + '">');
+    body.querySelector('#f_file').onchange = function () {
+      const f = this.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { body.querySelector('#f_preview').src = r.result; body.querySelector('#f_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+    };
+    body._getPayload = async function () {
+      const name = body.querySelector('#f_name').value.trim();
+      if (!name) { toast('Name is required', true); return null; }
+      const payload = {
+        name: name, link: body.querySelector('#f_link').value.trim(), sortOrder: body.querySelector('#f_order').value,
+        imageUrl: item ? item.imageUrl : '', driveFileId: item ? item.driveFileId : ''
+      };
+      const f = body.querySelector('#f_file').files[0];
+      if (f) {
+        if (f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
+        const b64 = await fileToBase64(f);
+        const up = await apiPost('uploadFile', { base64: b64, mimeType: f.type, fileName: f.name, kind: 'image' });
+        if (!up || !up.ok) { toast((up && up.error) || 'Upload failed', true); return null; }
+        payload.imageUrl = up.url; payload.driveFileId = up.fileId;
+      } else if (!item) { toast('Please choose a logo image', true); return null; }
+      return payload;
+    };
+  }, async function () {
+    const payload = await document.getElementById('modalBody')._getPayload();
+    if (!payload) return false;
+    const res = await apiPost(isEdit ? 'updateAffiliation' : 'createAffiliation', isEdit ? Object.assign({ id: item.id }, payload) : payload);
+    if (res && res.ok) { toast('Saved'); loadAffiliationsTable(); return true; }
+    toast((res && res.error) || 'Save failed', true); return false;
+  });
+}
+
+/* =========================================================
+   ENQUIRIES
+   ========================================================= */
+function renderEnquiries(c) {
+  c.innerHTML = '<div class="panel"><div class="panel-head"><h3>Enquiries</h3></div><div id="tableWrap"><div class="empty-row">Loading…</div></div></div>';
+  loadEnquiriesTable();
+}
+function loadEnquiriesTable() {
+  apiGet('getEnquiries', {}).then(function (res) {
+    const wrap = document.getElementById('tableWrap');
+    if (!res.ok) { wrap.innerHTML = '<div class="empty-row">' + (res.authError ? 'Session expired — please log in again.' : 'Failed to load.') + '</div>'; return; }
+    const rows = res.data.slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
+    if (!rows.length) { wrap.innerHTML = '<div class="empty-row">No enquiries yet.</div>'; return; }
+    wrap.innerHTML = '<table><thead><tr><th>Name</th><th>Contact</th><th>Subject</th><th>Message</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody>' +
+      rows.map(function (e) {
+        return '<tr><td>' + esc(e.name) + '</td><td>' + esc(e.email) + '<br>' + esc(e.phone) + '</td><td>' + esc(e.subject) + '</td>' +
+          '<td style="max-width:220px;">' + esc(String(e.message).slice(0, 90)) + (String(e.message).length > 90 ? '…' : '') + '</td>' +
+          '<td>' + fmtDate(e.date) + '</td>' +
+          '<td><select data-status="' + e.id + '" class="badge-select">' +
+          ['new', 'read', 'responded'].map(function (s) { return '<option value="' + s + '"' + (e.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-danger" data-del="' + e.id + '">Delete</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    wrap.querySelectorAll('[data-status]').forEach(function (sel) {
+      sel.onchange = function () { apiPost('updateEnquiryStatus', { id: sel.dataset.status, status: sel.value }).then(function () { toast('Status updated'); }); };
+    });
+    wrap.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { confirmDelete('deleteEnquiry', b.dataset.del, loadEnquiriesTable); }; });
+  });
+}
+
+/* =========================================================
+   SETTINGS
+   ========================================================= */
+function renderSettings(c) {
+  c.innerHTML = '<div class="panel">Loading…</div>';
+  apiGet('getAllConfig', {}).then(function (res) {
+    if (!res.ok) { c.innerHTML = '<div class="panel">' + (res.authError ? 'Session expired — please log in again.' : 'Failed to load settings.') + '</div>'; return; }
+    const cfg = res.data;
+    c.innerHTML =
+      '<div class="panel"><h3 style="margin-top:0;">School Details</h3>' +
+      field('School Name', '<input id="s_name" value="' + esc(cfg.SCHOOL_NAME) + '">') +
+      '<div class="field-row">' + field('Crest Initials (e.g. GP)', '<input id="s_init" value="' + esc(cfg.SCHOOL_INITIALS) + '">') +
+      field('Est./Affiliation line', '<input id="s_est" value="' + esc(cfg.EST_LINE) + '">') + '</div>' +
+      field('Tagline', '<input id="s_tag" value="' + esc(cfg.TAGLINE) + '">') +
+      field('Logo URL (shown in crest if set)', '<input id="s_logo" value="' + esc(cfg.LOGO_URL) + '">') +
+      '<div class="field-row">' + field('Contact Email', '<input id="s_email" value="' + esc(cfg.CONTACT_EMAIL) + '">') +
+      field('Contact Phone', '<input id="s_phone" value="' + esc(cfg.CONTACT_PHONE) + '">') + '</div>' +
+      field('Address', '<input id="s_addr" value="' + esc(cfg.ADDRESS) + '">') +
+      field('Footer Credit Line', '<input id="s_credit" value="' + esc(cfg.FOOTER_CREDIT) + '">') +
+      '<button class="btn btn-primary" id="saveSchoolBtn">Save Details</button></div>' +
+
+      '<div class="panel"><h3 style="margin-top:0;">Homepage Hero</h3>' +
+      field('Eyebrow (small tag above title)', '<input id="h_eyebrow" value="' + esc(cfg.HERO_EYEBROW) + '">') +
+      field('Hero Title', '<input id="h_title" value="' + esc(cfg.HERO_TITLE) + '">') +
+      field('Highlight phrase (must exactly match part of the title, gets underlined)', '<input id="h_highlight" value="' + esc(cfg.HERO_HIGHLIGHT) + '">') +
+      field('Hero Description', '<textarea id="h_desc">' + esc(cfg.HERO_DESC) + '</textarea>') +
+      '<button class="btn btn-primary" id="saveHeroBtn">Save Hero</button></div>' +
+
+      '<div class="panel"><h3 style="margin-top:0;">Highlight Stats (4 badges on homepage)</h3>' +
+      [1,2,3,4].map(function (i) {
+        return '<div class="field-row">' + field('Stat ' + i + ' Value', '<input id="st' + i + 'v" value="' + esc(cfg['STAT' + i + '_VALUE']) + '">') +
+          field('Stat ' + i + ' Label', '<input id="st' + i + 'l" value="' + esc(cfg['STAT' + i + '_LABEL']) + '">') + '</div>';
+      }).join('') +
+      '<button class="btn btn-primary" id="saveStatsBtn">Save Stats</button></div>' +
+
+      '<div class="panel"><h3 style="margin-top:0;">Principal\'s Message</h3>' +
+      '<div class="field-row">' + field('Name', '<input id="pr_name" value="' + esc(cfg.PRINCIPAL_NAME) + '">') +
+      field('Title', '<input id="pr_title" value="' + esc(cfg.PRINCIPAL_TITLE) + '">') + '</div>' +
+      '<div class="field"><label>Photo</label><input id="pr_file" type="file" accept="image/*">' +
+      '<img id="pr_preview" class="preview-img" src="' + esc(cfg.PRINCIPAL_PHOTO) + '" style="' + (cfg.PRINCIPAL_PHOTO ? 'display:block;' : '') + '"></div>' +
+      field('Message', '<textarea id="pr_msg">' + esc(cfg.PRINCIPAL_MESSAGE) + '</textarea>') +
+      field('Pull Quote', '<textarea id="pr_quote">' + esc(cfg.PRINCIPAL_QUOTE) + '</textarea>') +
+      '<button class="btn btn-primary" id="savePrincipalBtn">Save Principal Message</button></div>' +
+
+      '<div class="panel"><h3 style="margin-top:0;">Social Links</h3>' +
+      '<div class="field-row">' + field('Facebook', '<input id="so_fb" value="' + esc(cfg.SOCIAL_FACEBOOK) + '">') +
+      field('Instagram', '<input id="so_ig" value="' + esc(cfg.SOCIAL_INSTAGRAM) + '">') + '</div>' +
+      '<div class="field-row">' + field('YouTube', '<input id="so_yt" value="' + esc(cfg.SOCIAL_YOUTUBE) + '">') +
+      field('LinkedIn', '<input id="so_li" value="' + esc(cfg.SOCIAL_LINKEDIN) + '">') + '</div>' +
+      '<button class="btn btn-primary" id="saveSocialBtn">Save Social Links</button></div>' +
+
+      '<div class="panel"><h3 style="margin-top:0;">Homepage Popup</h3>' +
+      field('Popup Active', '<select id="p_active"><option value="false"' + (String(cfg.POPUP_ACTIVE) !== 'true' ? ' selected' : '') + '>Off</option><option value="true"' + (String(cfg.POPUP_ACTIVE) === 'true' ? ' selected' : '') + '>On</option></select>') +
+      field('Popup Title', '<input id="p_title" value="' + esc(cfg.POPUP_TITLE) + '">') +
+      field('Popup Link (optional)', '<input id="p_link" value="' + esc(cfg.POPUP_LINK) + '">') +
+      '<div class="field"><label>Popup Image</label><input id="p_file" type="file" accept="image/*">' +
+      '<img id="p_preview" class="preview-img" src="' + esc(cfg.POPUP_IMAGE) + '" style="' + (cfg.POPUP_IMAGE ? 'display:block;' : '') + '"></div>' +
+      '<button class="btn btn-gold" id="savePopupBtn">Save Popup</button></div>' +
+
+      '<div class="panel"><h3 style="margin-top:0;">Change Admin Password</h3>' +
+      field('New Password', '<input id="s_pw" type="password" placeholder="At least 6 characters">') +
+      '<button class="btn btn-ghost" id="savePwBtn">Update Password</button></div>';
+
+    document.getElementById('s_logo') && (document.getElementById('s_logo').oninput = function () {});
+    document.getElementById('p_file').onchange = function () {
+      const f = this.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { document.getElementById('p_preview').src = r.result; document.getElementById('p_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+    };
+    document.getElementById('pr_file').onchange = function () {
+      const f = this.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { document.getElementById('pr_preview').src = r.result; document.getElementById('pr_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+    };
+    document.getElementById('saveSchoolBtn').onclick = function () {
+      apiPost('updateConfig', { values: {
+        SCHOOL_NAME: document.getElementById('s_name').value, SCHOOL_INITIALS: document.getElementById('s_init').value,
+        EST_LINE: document.getElementById('s_est').value, TAGLINE: document.getElementById('s_tag').value,
+        LOGO_URL: document.getElementById('s_logo').value, CONTACT_EMAIL: document.getElementById('s_email').value,
+        CONTACT_PHONE: document.getElementById('s_phone').value, ADDRESS: document.getElementById('s_addr').value,
+        FOOTER_CREDIT: document.getElementById('s_credit').value
+      }}).then(function (res) { res && res.ok ? toast('School details saved') : toast('Save failed', true); });
+    };
+    document.getElementById('saveHeroBtn').onclick = function () {
+      apiPost('updateConfig', { values: {
+        HERO_EYEBROW: document.getElementById('h_eyebrow').value, HERO_TITLE: document.getElementById('h_title').value,
+        HERO_HIGHLIGHT: document.getElementById('h_highlight').value, HERO_DESC: document.getElementById('h_desc').value
+      }}).then(function (res) { res && res.ok ? toast('Hero saved') : toast('Save failed', true); });
+    };
+    document.getElementById('saveStatsBtn').onclick = function () {
+      const values = {};
+      [1,2,3,4].forEach(function (i) { values['STAT' + i + '_VALUE'] = document.getElementById('st' + i + 'v').value; values['STAT' + i + '_LABEL'] = document.getElementById('st' + i + 'l').value; });
+      apiPost('updateConfig', { values: values }).then(function (res) { res && res.ok ? toast('Stats saved') : toast('Save failed', true); });
+    };
+    document.getElementById('savePrincipalBtn').onclick = async function () {
+      let photo = cfg.PRINCIPAL_PHOTO;
+      const f = document.getElementById('pr_file').files[0];
+      if (f) {
+        if (f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return; }
+        const b64 = await fileToBase64(f);
+        const up = await apiPost('uploadFile', { base64: b64, mimeType: f.type, fileName: f.name, kind: 'image' });
+        if (!up || !up.ok) { toast((up && up.error) || 'Upload failed', true); return; }
+        photo = up.url;
+      }
+      apiPost('updateConfig', { values: {
+        PRINCIPAL_NAME: document.getElementById('pr_name').value, PRINCIPAL_TITLE: document.getElementById('pr_title').value,
+        PRINCIPAL_PHOTO: photo, PRINCIPAL_MESSAGE: document.getElementById('pr_msg').value, PRINCIPAL_QUOTE: document.getElementById('pr_quote').value
+      }}).then(function (res) { res && res.ok ? toast('Principal message saved') : toast('Save failed', true); });
+    };
+    document.getElementById('saveSocialBtn').onclick = function () {
+      apiPost('updateConfig', { values: {
+        SOCIAL_FACEBOOK: document.getElementById('so_fb').value, SOCIAL_INSTAGRAM: document.getElementById('so_ig').value,
+        SOCIAL_YOUTUBE: document.getElementById('so_yt').value, SOCIAL_LINKEDIN: document.getElementById('so_li').value
+      }}).then(function (res) { res && res.ok ? toast('Social links saved') : toast('Save failed', true); });
+    };
+    document.getElementById('savePopupBtn').onclick = async function () {
+      let popupImage = cfg.POPUP_IMAGE;
+      const f = document.getElementById('p_file').files[0];
+      if (f) {
+        if (f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return; }
+        const b64 = await fileToBase64(f);
+        const up = await apiPost('uploadFile', { base64: b64, mimeType: f.type, fileName: f.name, kind: 'image' });
+        if (!up || !up.ok) { toast((up && up.error) || 'Upload failed', true); return; }
+        popupImage = up.url;
+      }
+      apiPost('updateConfig', { values: {
+        POPUP_ACTIVE: document.getElementById('p_active').value, POPUP_TITLE: document.getElementById('p_title').value,
+        POPUP_LINK: document.getElementById('p_link').value, POPUP_IMAGE: popupImage
+      }}).then(function (res) { res && res.ok ? toast('Popup settings saved') : toast('Save failed', true); });
+    };
+    document.getElementById('savePwBtn').onclick = function () {
+      const pw = document.getElementById('s_pw').value;
+      if (pw.length < 6) { toast('Password must be at least 6 characters', true); return; }
+      apiPost('changePassword', { newPassword: pw }).then(function (res) {
+        if (res && res.ok) { toast('Password updated'); document.getElementById('s_pw').value = ''; }
+        else toast((res && res.error) || 'Failed', true);
+      });
+    };
+  });
+}
+
+/* =========================================================
+   SHARED MODAL + HELPERS
+   ========================================================= */
+function field(label, inputHtml) { return '<div class="field"><label>' + label + '</label>' + inputHtml + '</div>'; }
+
+let currentSaveHandler = null;
+function openModal(title, buildFn, saveFn) {
+  document.getElementById('modalTitle').textContent = title;
+  const body = document.getElementById('modalBody');
+  body.innerHTML = '';
+  buildFn(body);
+  currentSaveHandler = saveFn;
+  document.getElementById('modalOverlay').classList.add('active');
+}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); currentSaveHandler = null; }
+document.getElementById('modalClose').onclick = closeModal;
+document.getElementById('modalCancel').onclick = closeModal;
+document.getElementById('modalSave').onclick = async function () {
+  if (!currentSaveHandler) return;
+  const btn = this;
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  const ok = await currentSaveHandler();
+  btn.textContent = 'Save'; btn.disabled = false;
+  if (ok) closeModal();
+};
+
+function confirmDelete(action, id, refreshFn) {
+  if (!confirm('Delete this item? This cannot be undone.')) return;
+  apiPost(action, { id: id }).then(function (res) {
+    if (res && res.ok) { toast('Deleted'); refreshFn(); } else { toast((res && res.error) || 'Delete failed', true); }
+  });
+}
+</script>
+</body>
+</html>
