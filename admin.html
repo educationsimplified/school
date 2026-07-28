@@ -174,48 +174,36 @@ tr:last-child td{border-bottom:none;}
 /* =========================================================
    CONFIG
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycbxt5gh3o2xSeUT-KQEpZ60zh9hkovHB9wy7cGWn_qh0-8o4mpgXhAjiQJouJbOZrzZb/exec';
+const API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
 let TOKEN = sessionStorage.getItem('admin_token') || '';
 
-/* ---------- JSONP GET ---------- */
-let jsonpCounter = 0;
+/* ---------- API layer (plain fetch — Apps Script returns readable CORS responses) ---------- */
 function apiGet(action, params) {
-  return new Promise(function (resolve, reject) {
-    const cbName = 'jsonp_cb_' + (jsonpCounter++);
-    const query = Object.assign({ action: action, callback: cbName, token: TOKEN }, params || {});
-    const qs = Object.keys(query).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(query[k] == null ? '' : query[k]); }).join('&');
-    const script = document.createElement('script');
-    window[cbName] = function (data) { resolve(data); delete window[cbName]; script.remove(); };
-    script.src = API_URL + '?' + qs;
-    script.onerror = function () { reject(new Error('Network error')); delete window[cbName]; };
-    document.body.appendChild(script);
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  url.searchParams.set('token', TOKEN);
+  Object.keys(params || {}).forEach(function (k) {
+    const v = params[k];
+    if (v !== undefined && v !== null) url.searchParams.set(k, v);
   });
+  return fetch(url.toString())
+    .then(function (res) { return res.json(); })
+    .catch(function (err) { return { ok: false, error: 'Network error: ' + err.message }; });
 }
 
-/* ---------- Hidden-iframe POST (writes) ---------- */
+/**
+ * POST body is plain text (not application/json) so the browser treats
+ * this as a "simple request" and skips the CORS preflight — Apps Script
+ * doesn't implement doOptions, so a preflighted request would fail.
+ */
 function apiPost(action, payload) {
-  return new Promise(function (resolve) {
-    const iframeName = 'post_frame_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-    function handler(e) {
-      window.removeEventListener('message', handler);
-      resolve(e.data);
-      setTimeout(function () { iframe.remove(); }, 400);
-    }
-    window.addEventListener('message', handler);
-    const form = document.createElement('form');
-    form.method = 'POST'; form.action = API_URL; form.target = iframeName; form.style.display = 'none';
-    const input = document.createElement('input');
-    input.name = 'payload';
-    input.value = JSON.stringify(Object.assign({ action: action, token: TOKEN }, payload));
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
-    form.remove();
-  });
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action: action, token: TOKEN }, payload))
+  })
+    .then(function (res) { return res.json(); })
+    .catch(function (err) { return { ok: false, error: 'Network error: ' + err.message }; });
 }
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
@@ -585,31 +573,89 @@ function loadFeaturedTable() {
 }
 function openFeaturedModal(item) {
   const isEdit = !!item;
+  const currentType = item ? item.type : 'photo';
   openModal(isEdit ? 'Edit Featured Item' : 'Add Featured Item', function (body) {
     body.innerHTML =
       field('Title', '<input id="f_title" value="' + esc(item ? item.title : '') + '">') +
       field('Caption', '<input id="f_caption" value="' + esc(item ? item.caption : '') + '">') +
-      field('Type', '<select id="f_type"><option value="photo"' + (!item || item.type === 'photo' ? ' selected' : '') + '>Photo</option><option value="video"' + (item && item.type === 'video' ? ' selected' : '') + '>Video</option></select>') +
-      '<div class="field"><label>File (Photo or Video)</label><input id="f_file" type="file" accept="image/*,video/*">' +
-      '<div class="file-hint">Images up to 4MB. Videos: keep short clips, hosting is Drive-based.</div></div>' +
+      field('Type', '<select id="f_type"><option value="photo"' + (currentType === 'photo' ? ' selected' : '') + '>Photo</option><option value="video"' + (currentType === 'video' ? ' selected' : '') + '>Video</option></select>') +
+      '<div id="f_photo_wrap">' +
+      '<div class="field"><label>Image Source</label><div class="upload-toggle">' +
+      '<button type="button" class="active" id="srcLinkBtn">Paste Link</button>' +
+      '<button type="button" id="srcUploadBtn">Upload File</button></div>' +
+      '<input id="f_link" placeholder="https://…" value="' + esc(currentType !== 'video' && item ? item.url : '') + '">' +
+      '<input id="f_file" type="file" accept="image/*" style="display:none;">' +
+      '<div class="file-hint">Direct uploads are stored in Google Drive automatically. Max 4MB.</div>' +
+      '<img id="f_preview" class="preview-img" src="' + (currentType !== 'video' && item ? esc(item.url) : '') + '" style="' + (currentType !== 'video' && item ? 'display:block;' : '') + '"></div>' +
+      '</div>' +
+      '<div id="f_video_wrap" style="display:none;">' +
+      field('YouTube Link', '<input id="f_youtube" placeholder="https://youtu.be/…" value="' + esc(currentType === 'video' && item ? item.url : '') + '">') +
+      '</div>' +
       field('Display Order', '<input id="f_order" type="number" value="' + (item ? item.sortOrder : 0) + '">');
+
+    let mode = 'link'; // photo sub-mode: link | upload
+    const typeSelect = body.querySelector('#f_type');
+    const photoWrap = body.querySelector('#f_photo_wrap');
+    const videoWrap = body.querySelector('#f_video_wrap');
+    const linkBtn = body.querySelector('#srcLinkBtn'), uploadBtn = body.querySelector('#srcUploadBtn');
+    const linkInput = body.querySelector('#f_link'), fileInput = body.querySelector('#f_file');
+
+    function syncImageMode() {
+      linkBtn.classList.toggle('active', mode === 'link');
+      uploadBtn.classList.toggle('active', mode === 'upload');
+      linkInput.style.display = mode === 'link' ? 'block' : 'none';
+      fileInput.style.display = mode === 'upload' ? 'block' : 'none';
+    }
+    function syncTypeVisibility() {
+      const isVideo = typeSelect.value === 'video';
+      photoWrap.style.display = isVideo ? 'none' : 'block';
+      videoWrap.style.display = isVideo ? 'block' : 'none';
+    }
+    linkBtn.onclick = function () { mode = 'link'; syncImageMode(); };
+    uploadBtn.onclick = function () { mode = 'upload'; syncImageMode(); };
+    typeSelect.onchange = syncTypeVisibility;
+    syncImageMode();
+    syncTypeVisibility();
+
+    fileInput.onchange = function () {
+      const f = fileInput.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { body.querySelector('#f_preview').src = r.result; body.querySelector('#f_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+    };
+
     body._getPayload = async function () {
       const title = body.querySelector('#f_title').value.trim();
       if (!title) { toast('Title is required', true); return null; }
+      const type = typeSelect.value;
       const payload = {
         title: title, caption: body.querySelector('#f_caption').value.trim(),
-        type: body.querySelector('#f_type').value, sortOrder: body.querySelector('#f_order').value,
+        type: type, sortOrder: body.querySelector('#f_order').value,
         url: item ? item.url : '', driveFileId: item ? item.driveFileId : '', active: true
       };
-      const f = body.querySelector('#f_file').files[0];
+
+      if (type === 'video') {
+        const yt = body.querySelector('#f_youtube').value.trim();
+        if (!yt) { toast('Please paste a YouTube link', true); return null; }
+        payload.url = yt;
+        payload.driveFileId = '';
+        return payload;
+      }
+
+      if (mode === 'link') {
+        const url = linkInput.value.trim();
+        if (!url) { toast('Please paste an image link', true); return null; }
+        payload.url = url;
+        payload.driveFileId = '';
+        return payload;
+      }
+      const f = fileInput.files[0];
+      if (!f && !item) { toast('Please choose a file', true); return null; }
       if (f) {
-        const kind = f.type.startsWith('video') ? 'video' : 'image';
-        if (kind === 'image' && f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
+        if (f.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
         const b64 = await fileToBase64(f);
         const up = await apiPost('uploadFile', { base64: b64, mimeType: f.type, fileName: f.name, kind: 'image' });
         if (!up || !up.ok) { toast((up && up.error) || 'Upload failed', true); return null; }
         payload.url = up.url; payload.driveFileId = up.fileId;
-      } else if (!item) { toast('Please choose a file', true); return null; }
+      }
       return payload;
     };
   }, async function () {
