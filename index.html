@@ -239,15 +239,54 @@ section.standard-section{padding:4.5rem 2rem; max-width:1150px; margin:0 auto;}
 
 .empty-state{padding:2.2rem; text-align:center; color:var(--ink-soft); font-weight:700; border:2px dashed var(--line); border-radius:var(--radius-sm); grid-column:1/-1;}
 
-@media(max-width:900px){ .hero-grid,.about-grid,.contact-grid{grid-template-columns:1fr;} .highlights-board{grid-template-columns:1fr 1fr;} }
+html{overflow-x:hidden;}
+@media(max-width:900px){
+  .hero-grid,.about-grid,.contact-grid{grid-template-columns:1fr;}
+  .highlights-board{grid-template-columns:1fr 1fr;}
+  .programs-grid{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
+}
 @media(max-width:768px){
-  .hero{padding:3.5rem 1.4rem 2.5rem;}
+  .hero{padding:3rem 1.25rem 2rem;}
   .hamburger{display:block;}
-  .nav-right{display:none; position:absolute; top:100%; left:0; width:100%; background:var(--canvas); border-bottom:3px solid var(--ink); flex-direction:column; padding:1.75rem; gap:1.25rem; z-index:100;}
+  .nav-right{display:none; position:absolute; top:100%; left:0; width:100%; background:var(--canvas); border-bottom:3px solid var(--ink); flex-direction:column; padding:1.5rem; gap:1.1rem; z-index:100;}
   .nav-right.active{display:flex;}
-  .nav-links{flex-direction:column; align-items:flex-start; width:100%;}
-  .search-form{width:100%; order:-1;} .search-input{width:100%;}
-  .footer-text{flex-direction:column; text-align:center;}
+  .nav-links{flex-direction:column; align-items:flex-start; width:100%; gap:1rem;}
+  .search-form{width:100%; order:-1;}
+  .search-input{width:100%;}
+  section.standard-section{padding:3rem 1.25rem;}
+  .hero-title{font-size:clamp(1.9rem,7vw,2.6rem);}
+  .cal-grid{gap:4px;}
+  .cal-day{font-size:.72rem; padding:4px;}
+}
+@media(max-width:600px){
+  .nav-container{padding:.85rem 1.1rem;}
+  .nav-logo{font-size:1.15rem; gap:8px;}
+  .nav-logo .crest{width:34px; height:34px;}
+  .hero-eyebrow{font-size:.68rem; padding:.35rem .7rem;}
+  .hero-desc{font-size:1rem;}
+  .hero-actions{flex-direction:column; align-items:stretch;}
+  .hero-actions a{justify-content:center;}
+  .highlights-board{grid-template-columns:1fr 1fr; gap:.75rem;}
+  .highlight-badge{padding:1.1rem 1rem;}
+  .highlight-value{font-size:1.6rem;}
+  .card{padding:1.5rem;}
+  .section-title{font-size:clamp(1.6rem,6vw,2.1rem); margin-bottom:1.75rem;}
+  .about-grid,.contact-grid{gap:1.75rem;}
+  .contact-card{padding:1.75rem;}
+  .notice-grid,.video-grid,.programs-grid{grid-template-columns:1fr;}
+  #gallery-photos-section{grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:.6rem;}
+  .feat-card{flex:0 0 220px;}
+  .filter-bar{gap:.5rem;}
+  .chip{padding:.4rem .85rem; font-size:.76rem;}
+  .cal-wrap{padding:1.25rem;}
+  .cal-dow{font-size:.6rem;}
+  .cal-day{font-size:.68rem; border-radius:6px;}
+  .footer-text{flex-direction:column; text-align:center; gap:1rem;}
+}
+@media(max-width:380px){
+  .highlights-board{grid-template-columns:1fr;}
+  .hero-title{font-size:1.6rem;}
+  #gallery-photos-section{grid-template-columns:repeat(auto-fill,minmax(95px,1fr));}
 }
 @media(prefers-reduced-motion:reduce){ .reveal{transition:none; opacity:1; transform:none;} .affiliations-row{animation:none;} }
 ::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-track{background:var(--canvas);} ::-webkit-scrollbar-thumb{background:var(--line); border-radius:10px;}
@@ -442,7 +481,7 @@ section.standard-section{padding:4.5rem 2rem; max-width:1150px; margin:0 auto;}
 </footer>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbxt5gh3o2xSeUT-KQEpZ60zh9hkovHB9wy7cGWn_qh0-8o4mpgXhAjiQJouJbOZrzZb/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycby-iW_Itpjpt5xWVmbWYA7pGAv6QvXctNap8pusiBkrvZn7WIZli4opI_u0v0A76Wha/exec';
 
 /* boot + reveal + progress bar */
 const bootScreen = document.getElementById('boot-screen');
@@ -462,35 +501,26 @@ window.addEventListener('scroll', function () {
 });
 document.getElementById('navToggle').onclick = function () { document.getElementById('navRight').classList.toggle('active'); };
 
-/* JSONP GET */
-let jsonpCounter = 0;
+/* ---------- API layer (plain fetch — Apps Script returns readable CORS responses) ---------- */
 function apiGet(action, params) {
-  return new Promise(function (resolve, reject) {
-    const cbName = 'jsonp_cb_' + (jsonpCounter++);
-    const query = Object.assign({ action: action, callback: cbName }, params || {});
-    const qs = Object.keys(query).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]); }).join('&');
-    const script = document.createElement('script');
-    window[cbName] = function (data) { resolve(data); delete window[cbName]; script.remove(); };
-    script.src = API_URL + '?' + qs;
-    script.onerror = function () { reject(new Error('Network error')); delete window[cbName]; };
-    document.body.appendChild(script);
+  const url = new URL(API_URL);
+  url.searchParams.set('action', action);
+  Object.keys(params || {}).forEach(function (k) {
+    const v = params[k];
+    if (v !== undefined && v !== null) url.searchParams.set(k, v);
   });
+  return fetch(url.toString())
+    .then(function (res) { return res.json(); })
+    .catch(function (err) { return { ok: false, error: 'Network error: ' + err.message }; });
 }
-/* hidden-iframe POST (enquiry form only, public site has no other writes) */
 function apiPost(action, payload) {
-  return new Promise(function (resolve) {
-    const iframeName = 'post_frame_' + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName; iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-    function handler(e) { window.removeEventListener('message', handler); resolve(e.data); setTimeout(function () { iframe.remove(); }, 500); }
-    window.addEventListener('message', handler);
-    const form = document.createElement('form');
-    form.method = 'POST'; form.action = API_URL; form.target = iframeName; form.style.display = 'none';
-    const input = document.createElement('input');
-    input.name = 'payload'; input.value = JSON.stringify(Object.assign({ action: action }, payload));
-    form.appendChild(input); document.body.appendChild(form); form.submit(); form.remove();
-  });
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action: action }, payload))
+  })
+    .then(function (res) { return res.json(); })
+    .catch(function (err) { return { ok: false, error: 'Network error: ' + err.message }; });
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
 function fmtDate(d) { const dt = new Date(d); return isNaN(dt) ? '' : dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
@@ -669,7 +699,9 @@ apiGet('getFeatured', {}).then(function (res) {
   const strip = document.getElementById('featuredStrip');
   if (!res.data.length) { strip.innerHTML = '<div class="empty-state">Nothing featured yet.</div>'; return; }
   strip.innerHTML = res.data.map(function (f) {
-    const media = f.type === 'video' ? '<video src="' + esc(f.url) + '" muted loop autoplay playsinline></video>' : '<img src="' + esc(f.url) + '" loading="lazy">';
+    const media = f.type === 'video'
+      ? '<iframe src="https://www.youtube.com/embed/' + esc(f.url) + '" allowfullscreen loading="lazy" style="width:100%;height:100%;border:none;"></iframe>'
+      : '<img src="' + esc(f.url) + '" loading="lazy">';
     return '<div class="feat-card">' + media + '<div class="feat-badge">' + esc(f.type) + '</div>' +
       '<div class="feat-cap"><strong>' + esc(f.title) + '</strong><div style="font-size:.8rem;opacity:.8;">' + esc(f.caption) + '</div></div></div>';
   }).join('');
