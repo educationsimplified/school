@@ -689,8 +689,12 @@ document.getElementById('lightbox').addEventListener('click', function (e) { if 
 /* NEWS */
 let newsPage = 1, newsQuery = '', newsCategory = '';
 function loadNews() {
-  document.getElementById('newsGrid').innerHTML = '<div class="empty-state">Loading news…</div>';
-  apiGet('getNews', { q: newsQuery, category: newsCategory, page: newsPage, limit: 6 }).then(function (res) { if (res.ok) renderNews(res.data); });
+  const tbody = document.getElementById('newsTableBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Loading news…</td></tr>';
+  apiGet('getNews', { q: newsQuery, category: newsCategory, page: newsPage, limit: 6 }).then(function (res) {
+    if (res && res.ok) renderNews(res.data);
+    else if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Failed to load news.</td></tr>';
+  });
 }
 let newsItemsById = {};
 function renderNews(pageData) {
