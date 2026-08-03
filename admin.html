@@ -557,8 +557,10 @@ function renderFeatured(c) {
   loadFeaturedTable();
 }
 function loadFeaturedTable() {
-  apiGet('getFeatured', {}).then(function (rows) {
+  apiGet('getFeatured', {}).then(function (res) {
     const wrap = document.getElementById('tableWrap');
+    if (!res || !res.ok) { wrap.innerHTML = '<div class="empty-row">Failed to load.</div>'; return; }
+    const rows = res.data;
     if (!rows.length) { wrap.innerHTML = '<div class="empty-row">Nothing featured yet.</div>'; return; }
     wrap.innerHTML = '<table><thead><tr><th></th><th>Title</th><th>Type</th><th>Order</th><th>Active</th><th></th></tr></thead><tbody>' +
       rows.map(function (f) {
@@ -621,7 +623,15 @@ function openFeaturedModal(item) {
       const f = fileInput.files[0];
       if (f) { const r = new FileReader(); r.onload = function () { body.querySelector('#f_preview').src = r.result; body.querySelector('#f_preview').style.display = 'block'; }; r.readAsDataURL(f); }
     };
+linkInput.oninput = function () {
+  const preview = body.querySelector('#f_preview');
+  const v = linkInput.value.trim();
+  if (v) { preview.src = v; preview.style.display = 'block'; }
+  else { preview.style.display = 'none'; }
+};
 
+
+    
     body._getPayload = async function () {
       const title = body.querySelector('#f_title').value.trim();
       if (!title) { toast('Title is required', true); return null; }
