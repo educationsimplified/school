@@ -140,6 +140,43 @@ section.standard-section{padding:4.5rem 2rem; max-width:1150px; margin:0 auto;}
 .chip{padding:.5rem 1.1rem; border-radius:999px; font-size:.82rem; font-weight:700; cursor:pointer; border:2px solid var(--ink); color:var(--ink-soft); background:var(--paper);}
 .chip.active{background:var(--ink); color:#FFFCF5;}
 
+.notice-table-wrap{padding:0; overflow:hidden;}
+.notice-table{width:100%; border-collapse:collapse; font-size:.95rem;}
+.notice-table thead th{
+  text-align:left; padding:1rem 1.4rem; background:var(--paper-alt); color:var(--ink-soft);
+  font-family:var(--font-mono); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  border-bottom:2px solid var(--ink);
+}
+.notice-table thead th:last-child{text-align:center;}
+.notice-row td{padding:1.1rem 1.4rem; border-bottom:1px solid var(--line); vertical-align:top; font-weight:600; color:var(--ink-soft);}
+.notice-row:last-child td{border-bottom:none;}
+.notice-row:hover{background:var(--sky-tint);}
+.notice-row .notice-title-cell{color:var(--ink); font-weight:800; font-family:var(--font-display); font-size:1.02rem; cursor:pointer; user-select:none; min-width:220px;}
+.notice-row .notice-title-cell:hover{color:var(--sky-deep);}
+.notice-row .notice-title-cell .hint{display:block; font-family:var(--font-mono); font-size:.66rem; font-weight:600; color:var(--ink-soft); opacity:.6; text-transform:none; margin-top:3px;}
+.notice-row .notice-summary-cell{max-width:340px;}
+.notice-row .notice-date-cell,.notice-row .notice-author-cell{font-family:var(--font-mono); font-size:.82rem; white-space:nowrap;}
+.notice-row .notice-pdf-cell{text-align:center;}
+.pdf-yes,.pdf-no{display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:10px; font-size:1rem;}
+.pdf-yes{background:var(--meadow-tint); color:var(--meadow-deep);}
+.pdf-no{background:var(--poppy-tint); color:var(--poppy-deep); opacity:.55;}
+.notice-detail-row td{padding:0; border-bottom:1px solid var(--line);}
+.notice-detail-row.collapsed{display:none;}
+.notice-detail{padding:1.6rem 1.8rem 1.9rem; background:var(--paper-alt); display:grid; grid-template-columns:220px 1fr; gap:1.6rem;}
+.notice-detail-image{width:100%; border-radius:var(--radius-sm); overflow:hidden; border:2px solid var(--line); aspect-ratio:4/3; background:var(--paper);}
+.notice-detail-image img{width:100%; height:100%; object-fit:cover;}
+.notice-detail-body h4{font-size:1.05rem; margin-bottom:.5rem; color:var(--sky-deep);}
+.notice-detail-body p{color:var(--ink-soft); font-weight:600; font-size:.94rem; margin-bottom:1rem; white-space:pre-wrap;}
+.notice-detail-pdf{display:inline-flex; align-items:center; gap:8px; font-weight:800; font-size:.88rem; color:var(--meadow-deep); background:var(--meadow-tint); padding:.55rem 1rem; border-radius:999px;}
+@media(max-width:700px){
+  .notice-table thead{display:none;}
+  .notice-table, .notice-table tbody, .notice-row, .notice-row td{display:block; width:100%;}
+  .notice-row{padding:1rem 1.2rem; border-bottom:1px solid var(--line);}
+  .notice-row td{padding:.2rem 0; border:none;}
+  .notice-row .notice-summary-cell{max-width:none;}
+  .notice-detail{grid-template-columns:1fr;}
+}
+  
 .notice-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:1.75rem;}
 .notice-card{padding:2rem; display:flex; flex-direction:column;}
 .notice-card::before{content:''; position:absolute; top:1.25rem; right:1.25rem; width:10px; height:10px; border-radius:50%; background:var(--poppy);}
@@ -396,7 +433,16 @@ html{overflow-x:hidden;}
 <section class="standard-section" id="news">
   <div class="reveal"><div class="section-eyebrow">Notice Board</div><h2 class="section-title">Latest News &amp; Events</h2></div>
   <div class="filter-bar" id="newsFilters"></div>
-  <div class="notice-grid" id="newsGrid"><div class="empty-state">Loading news…</div></div>
+  <div class="notice-table-wrap card" id="newsGrid">
+  <table class="notice-table">
+    <thead>
+      <tr><th>Title</th><th>Summary</th><th>Date</th><th>Author</th><th>PDF</th></tr>
+    </thead>
+    <tbody id="newsTableBody">
+      <tr><td colspan="5" class="empty-state">Loading news…</td></tr>
+    </tbody>
+  </table>
+</div>
   <div class="pagination" id="newsPagination"></div>
 </section>
 
@@ -646,23 +692,59 @@ function loadNews() {
   document.getElementById('newsGrid').innerHTML = '<div class="empty-state">Loading news…</div>';
   apiGet('getNews', { q: newsQuery, category: newsCategory, page: newsPage, limit: 6 }).then(function (res) { if (res.ok) renderNews(res.data); });
 }
+let newsItemsById = {};
 function renderNews(pageData) {
-  const grid = document.getElementById('newsGrid');
-  if (!pageData.items.length) { grid.innerHTML = '<div class="empty-state">No news found.</div>'; document.getElementById('newsPagination').innerHTML = ''; return; }
-  grid.innerHTML = pageData.items.map(function (n) {
-    return '<div class="card notice-card reveal">' +
-      (n.imageUrl ? '<div class="notice-thumb"><img src="' + esc(n.imageUrl) + '" loading="lazy"></div>' : '') +
-      '<div class="notice-date">' + esc(n.category) + ' · ' + fmtDate(n.date) + '</div>' +
-      '<h3 class="notice-title">' + esc(n.title) + '</h3>' +
-      '<div class="notice-snippet">' + esc(n.summary || (String(n.content || '').slice(0, 120) + '…')) + '</div>' +
-      '<div class="notice-foot"><span class="read-more">By ' + esc(n.author) + '</span>' +
-      (n.pdfUrl ? '<a class="pdf-tag" href="' + esc(n.pdfUrl) + '" target="_blank">📄 PDF</a>' : '') + '</div></div>';
+  const tbody = document.getElementById('newsTableBody');
+  if (!pageData.items.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No news found.</td></tr>';
+    document.getElementById('newsPagination').innerHTML = '';
+    return;
+  }
+  newsItemsById = {};
+  pageData.items.forEach(function (n) { newsItemsById[n.id] = n; });
+
+  tbody.innerHTML = pageData.items.map(function (n) {
+    const snippet = n.summary || (String(n.content || '').slice(0, 110) + (String(n.content || '').length > 110 ? '…' : ''));
+    return '<tr class="notice-row" data-id="' + esc(n.id) + '">' +
+      '<td class="notice-title-cell" data-toggle="' + esc(n.id) + '">' + esc(n.title) + '<span class="hint">Double-click to expand</span></td>' +
+      '<td class="notice-summary-cell">' + esc(snippet) + '</td>' +
+      '<td class="notice-date-cell">' + fmtDate(n.date) + '</td>' +
+      '<td class="notice-author-cell">' + esc(n.author) + '</td>' +
+      '<td class="notice-pdf-cell">' + (n.pdfUrl ? '<span class="pdf-yes">📄</span>' : '<span class="pdf-no">✕</span>') + '</td>' +
+      '</tr>' +
+      '<tr class="notice-detail-row collapsed" id="detail-' + esc(n.id) + '"><td colspan="5"></td></tr>';
   }).join('');
-  document.querySelectorAll('#newsGrid .reveal').forEach(function (el) { observer.observe(el); el.classList.add('visible'); });
+
+  document.querySelectorAll('[data-toggle]').forEach(function (cell) {
+    cell.addEventListener('dblclick', function () { toggleNewsDetail(cell.dataset.toggle); });
+  });
+
   let pag = '';
   for (let i = 1; i <= pageData.totalPages; i++) pag += '<div class="page-btn' + (i === pageData.page ? ' active' : '') + '" data-page="' + i + '">' + i + '</div>';
   document.getElementById('newsPagination').innerHTML = pag;
   document.querySelectorAll('.page-btn').forEach(function (btn) { btn.onclick = function () { newsPage = parseInt(btn.dataset.page, 10); loadNews(); }; });
+}
+
+function toggleNewsDetail(id) {
+  const row = document.getElementById('detail-' + id);
+  if (!row) return;
+  const isOpen = !row.classList.contains('collapsed');
+  document.querySelectorAll('.notice-detail-row').forEach(function (r) { r.classList.add('collapsed'); r.querySelector('td').innerHTML = ''; });
+  if (isOpen) return; // was already open -> just close it (handled above)
+
+  const n = newsItemsById[id];
+  if (!n) return;
+  const cell = row.querySelector('td');
+  cell.innerHTML =
+    '<div class="notice-detail">' +
+    (n.imageUrl ? '<div class="notice-detail-image"><img src="' + esc(n.imageUrl) + '" loading="lazy"></div>' : '') +
+    '<div class="notice-detail-body">' +
+    '<h4>' + esc(n.title) + '</h4>' +
+    (n.summary ? '<p><strong>' + esc(n.summary) + '</strong></p>' : '') +
+    (n.content ? '<p>' + esc(n.content) + '</p>' : '') +
+    (n.pdfUrl ? '<a class="notice-detail-pdf" href="' + esc(n.pdfUrl) + '" target="_blank">📄 View PDF Attachment</a>' : '') +
+    '</div></div>';
+  row.classList.remove('collapsed');
 }
 document.getElementById('navSearchForm').addEventListener('submit', function (e) {
   e.preventDefault();
