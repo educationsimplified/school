@@ -447,19 +447,71 @@ function openNewsModal(item) {
       field('Full Content', '<textarea id="f_content" style="min-height:120px;">' + esc(item ? item.content : '') + '</textarea>') +
       '<div class="field-row">' + field('Category', '<input id="f_category" value="' + esc(item ? item.category : 'General') + '">') +
       field('Author', '<input id="f_author" value="' + esc(item ? item.author : 'Admin') + '">') + '</div>' +
-      '<div class="field"><label>Cover Image (optional)</label><input id="f_img_file" type="file" accept="image/*">' +
-      '<div class="file-hint">Max 4MB.</div><img id="f_img_preview" class="preview-img" src="' + (item ? esc(item.imageUrl) : '') + '" style="' + (item && item.imageUrl ? 'display:block;' : '') + '"></div>' +
-      '<div class="field"><label>PDF Attachment (optional)</label><input id="f_pdf_file" type="file" accept="application/pdf">' +
-      '<div class="file-hint">Max 1MB, PDF only.</div><div id="f_pdf_name" style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">' + (item && item.pdfUrl ? '📄 Existing PDF attached' : '') + '</div></div>' +
+
+      '<div class="field"><label>Cover Image (optional)</label><div class="upload-toggle">' +
+      '<button type="button" class="active" id="imgLinkBtn">Paste Link</button>' +
+      '<button type="button" id="imgUploadBtn">Upload File</button></div>' +
+      '<input id="f_img_link" placeholder="https://…" value="' + esc(item && !item.imageFileId ? item.imageUrl : '') + '">' +
+      '<input id="f_img_file" type="file" accept="image/*" style="display:none;">' +
+      '<div class="file-hint">Direct uploads go to Google Drive automatically. Max 4MB. If pasting an external Google Drive link, copy it after setting sharing to "Anyone with the link".</div>' +
+      '<img id="f_img_preview" class="preview-img" src="' + (item ? esc(item.imageUrl) : '') + '" style="' + (item && item.imageUrl ? 'display:block;' : '') + '"></div>' +
+
+      '<div class="field"><label>PDF Attachment (optional)</label><div class="upload-toggle">' +
+      '<button type="button" class="active" id="pdfLinkBtn">Paste Link</button>' +
+      '<button type="button" id="pdfUploadBtn">Upload File</button></div>' +
+      '<input id="f_pdf_link" placeholder="https://…" value="' + esc(item && !item.pdfFileId ? item.pdfUrl : '') + '">' +
+      '<input id="f_pdf_file" type="file" accept="application/pdf" style="display:none;">' +
+      '<div class="file-hint">Uploads capped at 1MB, PDF only. If sharing via an external Google Drive link, please copy the link after setting "Share with anyone" — otherwise it won\'t open for visitors.</div>' +
+      '<div id="f_pdf_name" style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;">' + (item && item.pdfUrl ? '📄 Existing PDF attached' : '') + '</div></div>' +
+
       field('Status', '<select id="f_pub"><option value="true"' + (!item || String(item.published) !== 'false' ? ' selected' : '') + '>Published</option><option value="false"' + (item && String(item.published) === 'false' ? ' selected' : '') + '>Draft</option></select>');
-    body.querySelector('#f_img_file').onchange = function () {
-      const f = this.files[0];
-      if (f) { const r = new FileReader(); r.onload = function () { body.querySelector('#f_img_preview').src = r.result; body.querySelector('#f_img_preview').style.display = 'block'; }; r.readAsDataURL(f); }
+
+    /* ---- image link/upload toggle ---- */
+    let imgMode = (item && item.imageFileId) ? 'upload' : 'link';
+    const imgLinkBtn = body.querySelector('#imgLinkBtn'), imgUploadBtn = body.querySelector('#imgUploadBtn');
+    const imgLinkInput = body.querySelector('#f_img_link'), imgFileInput = body.querySelector('#f_img_file');
+    const imgPreview = body.querySelector('#f_img_preview');
+    function syncImgMode() {
+      imgLinkBtn.classList.toggle('active', imgMode === 'link');
+      imgUploadBtn.classList.toggle('active', imgMode === 'upload');
+      imgLinkInput.style.display = imgMode === 'link' ? 'block' : 'none';
+      imgFileInput.style.display = imgMode === 'upload' ? 'block' : 'none';
+    }
+    imgLinkBtn.onclick = function () { imgMode = 'link'; syncImgMode(); };
+    imgUploadBtn.onclick = function () { imgMode = 'upload'; syncImgMode(); };
+    syncImgMode();
+    imgLinkInput.oninput = function () {
+      const v = imgLinkInput.value.trim();
+      if (v) { imgPreview.src = v; imgPreview.style.display = 'block'; } else { imgPreview.style.display = 'none'; }
     };
-    body.querySelector('#f_pdf_file').onchange = function () {
-      const f = this.files[0];
-      if (f) body.querySelector('#f_pdf_name').textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+    imgFileInput.onchange = function () {
+      const f = imgFileInput.files[0];
+      if (f) { const r = new FileReader(); r.onload = function () { imgPreview.src = r.result; imgPreview.style.display = 'block'; }; r.readAsDataURL(f); }
     };
+
+    /* ---- pdf link/upload toggle ---- */
+    let pdfMode = (item && item.pdfFileId) ? 'upload' : 'link';
+    const pdfLinkBtn = body.querySelector('#pdfLinkBtn'), pdfUploadBtn = body.querySelector('#pdfUploadBtn');
+    const pdfLinkInput = body.querySelector('#f_pdf_link'), pdfFileInput = body.querySelector('#f_pdf_file');
+    const pdfNameEl = body.querySelector('#f_pdf_name');
+    function syncPdfMode() {
+      pdfLinkBtn.classList.toggle('active', pdfMode === 'link');
+      pdfUploadBtn.classList.toggle('active', pdfMode === 'upload');
+      pdfLinkInput.style.display = pdfMode === 'link' ? 'block' : 'none';
+      pdfFileInput.style.display = pdfMode === 'upload' ? 'block' : 'none';
+    }
+    pdfLinkBtn.onclick = function () { pdfMode = 'link'; syncPdfMode(); };
+    pdfUploadBtn.onclick = function () { pdfMode = 'upload'; syncPdfMode(); };
+    syncPdfMode();
+    pdfLinkInput.oninput = function () {
+      const v = pdfLinkInput.value.trim();
+      pdfNameEl.textContent = v ? '🔗 Linked PDF' : '';
+    };
+    pdfFileInput.onchange = function () {
+      const f = pdfFileInput.files[0];
+      if (f) pdfNameEl.textContent = f.name + ' (' + Math.round(f.size / 1024) + ' KB)';
+    };
+
     body._getPayload = async function () {
       const title = body.querySelector('#f_title').value.trim();
       if (!title) { toast('Title is required', true); return null; }
@@ -473,23 +525,38 @@ function openNewsModal(item) {
         pdfUrl: item ? item.pdfUrl : '', pdfFileId: item ? item.pdfFileId : '',
         date: item ? item.date : new Date().toISOString()
       };
-      const imgFile = body.querySelector('#f_img_file').files[0];
-      if (imgFile) {
-        if (imgFile.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
-        const b64 = await fileToBase64(imgFile);
-        const up = await apiPost('uploadFile', { base64: b64, mimeType: imgFile.type, fileName: imgFile.name, kind: 'image' });
-        if (!up || !up.ok) { toast((up && up.error) || 'Image upload failed', true); return null; }
-        payload.imageUrl = up.url; payload.imageFileId = up.fileId;
+
+      /* --- cover image --- */
+      if (imgMode === 'link') {
+        payload.imageUrl = imgLinkInput.value.trim();
+        payload.imageFileId = '';
+      } else {
+        const imgFile = imgFileInput.files[0];
+        if (imgFile) {
+          if (imgFile.size > 4 * 1024 * 1024) { toast('Image exceeds 4MB limit', true); return null; }
+          const b64 = await fileToBase64(imgFile);
+          const up = await apiPost('uploadFile', { base64: b64, mimeType: imgFile.type, fileName: imgFile.name, kind: 'image' });
+          if (!up || !up.ok) { toast((up && up.error) || 'Image upload failed', true); return null; }
+          payload.imageUrl = up.url; payload.imageFileId = up.fileId;
+        }
       }
-      const pdfFile = body.querySelector('#f_pdf_file').files[0];
-      if (pdfFile) {
-        if (pdfFile.type !== 'application/pdf') { toast('Attachment must be a PDF', true); return null; }
-        if (pdfFile.size > 1024 * 1024) { toast('PDF exceeds 1MB limit', true); return null; }
-        const b64 = await fileToBase64(pdfFile);
-        const up = await apiPost('uploadFile', { base64: b64, mimeType: pdfFile.type, fileName: pdfFile.name, kind: 'pdf' });
-        if (!up || !up.ok) { toast((up && up.error) || 'PDF upload failed', true); return null; }
-        payload.pdfUrl = up.url; payload.pdfFileId = up.fileId;
+
+      /* --- pdf attachment --- */
+      if (pdfMode === 'link') {
+        const pdfLink = pdfLinkInput.value.trim();
+        if (pdfLink) { payload.pdfUrl = pdfLink; payload.pdfFileId = ''; }
+      } else {
+        const pdfFile = pdfFileInput.files[0];
+        if (pdfFile) {
+          if (pdfFile.type !== 'application/pdf') { toast('Attachment must be a PDF', true); return null; }
+          if (pdfFile.size > 1024 * 1024) { toast('PDF exceeds 1MB limit', true); return null; }
+          const b64 = await fileToBase64(pdfFile);
+          const up = await apiPost('uploadFile', { base64: b64, mimeType: pdfFile.type, fileName: pdfFile.name, kind: 'pdf' });
+          if (!up || !up.ok) { toast((up && up.error) || 'PDF upload failed', true); return null; }
+          payload.pdfUrl = up.url; payload.pdfFileId = up.fileId;
+        }
       }
+
       return payload;
     };
   }, async function () {
