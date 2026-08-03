@@ -933,7 +933,13 @@ function renderSettings(c) {
       '<div class="field-row">' + field('Crest Initials (e.g. GP)', '<input id="s_init" value="' + esc(cfg.SCHOOL_INITIALS) + '">') +
       field('Est./Affiliation line', '<input id="s_est" value="' + esc(cfg.EST_LINE) + '">') + '</div>' +
       field('Tagline', '<input id="s_tag" value="' + esc(cfg.TAGLINE) + '">') +
-      field('Logo URL (shown in crest if set)', '<input id="s_logo" value="' + esc(cfg.LOGO_URL) + '">') +
+      '<div class="field"><label>School Logo (shown in crest if set)</label><div class="upload-toggle">' +
+      '<button type="button" class="active" id="logoLinkBtn">Paste Link</button>' +
+      '<button type="button" id="logoUploadBtn">Upload File</button></div>' +
+      '<input id="s_logo" placeholder="https://…" value="' + esc(cfg.LOGO_URL) + '">' +
+      '<input id="s_logo_file" type="file" accept="image/*" style="display:none;">' +
+      '<div class="file-hint">Direct uploads are stored in Google Drive automatically. Max 4MB.</div>' +
+      '<img id="s_logo_preview" class="preview-img" src="' + esc(cfg.LOGO_URL) + '" style="' + (cfg.LOGO_URL ? 'display:block;' : '') + '"></div>' +
       '<div class="field-row">' + field('Contact Email', '<input id="s_email" value="' + esc(cfg.CONTACT_EMAIL) + '">') +
       field('Contact Phone', '<input id="s_phone" value="' + esc(cfg.CONTACT_PHONE) + '">') + '</div>' +
       field('Address', '<input id="s_addr" value="' + esc(cfg.ADDRESS) + '">') +
@@ -982,7 +988,30 @@ function renderSettings(c) {
       field('New Password', '<input id="s_pw" type="password" placeholder="At least 6 characters">') +
       '<button class="btn btn-ghost" id="savePwBtn">Update Password</button></div>';
 
-    document.getElementById('s_logo') && (document.getElementById('s_logo').oninput = function () {});
+    let logoMode = 'link';
+const logoLinkBtn = document.getElementById('logoLinkBtn');
+const logoUploadBtn = document.getElementById('logoUploadBtn');
+const logoLinkInput = document.getElementById('s_logo');
+const logoFileInput = document.getElementById('s_logo_file');
+const logoPreview = document.getElementById('s_logo_preview');
+function syncLogoMode() {
+  logoLinkBtn.classList.toggle('active', logoMode === 'link');
+  logoUploadBtn.classList.toggle('active', logoMode === 'upload');
+  logoLinkInput.style.display = logoMode === 'link' ? 'block' : 'none';
+  logoFileInput.style.display = logoMode === 'upload' ? 'block' : 'none';
+}
+logoLinkBtn.onclick = function () { logoMode = 'link'; syncLogoMode(); };
+logoUploadBtn.onclick = function () { logoMode = 'upload'; syncLogoMode(); };
+syncLogoMode();
+logoLinkInput.oninput = function () {
+  const v = logoLinkInput.value.trim();
+  if (v) { logoPreview.src = v; logoPreview.style.display = 'block'; }
+  else { logoPreview.style.display = 'none'; }
+};
+logoFileInput.onchange = function () {
+  const f = logoFileInput.files[0];
+  if (f) { const r = new FileReader(); r.onload = function () { logoPreview.src = r.result; logoPreview.style.display = 'block'; }; r.readAsDataURL(f); }
+};
     document.getElementById('p_file').onchange = function () {
       const f = this.files[0];
       if (f) { const r = new FileReader(); r.onload = function () { document.getElementById('p_preview').src = r.result; document.getElementById('p_preview').style.display = 'block'; }; r.readAsDataURL(f); }
@@ -991,15 +1020,24 @@ function renderSettings(c) {
       const f = this.files[0];
       if (f) { const r = new FileReader(); r.onload = function () { document.getElementById('pr_preview').src = r.result; document.getElementById('pr_preview').style.display = 'block'; }; r.readAsDataURL(f); }
     };
-    document.getElementById('saveSchoolBtn').onclick = function () {
-      apiPost('updateConfig', { values: {
-        SCHOOL_NAME: document.getElementById('s_name').value, SCHOOL_INITIALS: document.getElementById('s_init').value,
-        EST_LINE: document.getElementById('s_est').value, TAGLINE: document.getElementById('s_tag').value,
-        LOGO_URL: document.getElementById('s_logo').value, CONTACT_EMAIL: document.getElementById('s_email').value,
-        CONTACT_PHONE: document.getElementById('s_phone').value, ADDRESS: document.getElementById('s_addr').value,
-        FOOTER_CREDIT: document.getElementById('s_credit').value
-      }}).then(function (res) { res && res.ok ? toast('School details saved') : toast('Save failed', true); });
-    };
+    document.getElementById('saveSchoolBtn').onclick = async function () {
+  let logoUrl = document.getElementById('s_logo').value.trim();
+  const f = document.getElementById('s_logo_file').files[0];
+  if (logoMode === 'upload' && f) {
+    if (f.size > 4 * 1024 * 1024) { toast('Logo image exceeds 4MB limit', true); return; }
+    const b64 = await fileToBase64(f);
+    const up = await apiPost('uploadFile', { base64: b64, mimeType: f.type, fileName: f.name, kind: 'image' });
+    if (!up || !up.ok) { toast((up && up.error) || 'Logo upload failed', true); return; }
+    logoUrl = up.url;
+  }
+  apiPost('updateConfig', { values: {
+    SCHOOL_NAME: document.getElementById('s_name').value, SCHOOL_INITIALS: document.getElementById('s_init').value,
+    EST_LINE: document.getElementById('s_est').value, TAGLINE: document.getElementById('s_tag').value,
+    LOGO_URL: logoUrl, CONTACT_EMAIL: document.getElementById('s_email').value,
+    CONTACT_PHONE: document.getElementById('s_phone').value, ADDRESS: document.getElementById('s_addr').value,
+    FOOTER_CREDIT: document.getElementById('s_credit').value
+  }}).then(function (res) { res && res.ok ? toast('School details saved') : toast('Save failed', true); });
+};
     document.getElementById('saveHeroBtn').onclick = function () {
       apiPost('updateConfig', { values: {
         HERO_EYEBROW: document.getElementById('h_eyebrow').value, HERO_TITLE: document.getElementById('h_title').value,
