@@ -227,17 +227,44 @@ section.standard-section{padding:4.5rem 2rem; max-width:1150px; margin:0 auto;}
 .affiliations-group a:hover img{filter:none;}
 
   
-#gallery-photos-section{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:1.5rem; max-width:1150px; margin:0 auto; padding:0 2rem 2rem;}
-.gallery-tile{border-radius:var(--radius); overflow:hidden; border:2px solid var(--ink); background:var(--paper-alt); aspect-ratio:4/3; cursor:pointer; position:relative; box-shadow:var(--card-shadow); transition:var(--transition);}
-.gallery-tile:hover{transform:translateY(-4px); box-shadow:6px 6px 0 var(--ink);}
-.gallery-tile img{width:100%; height:100%; object-fit:cover; transition:transform .5s;}
-.gallery-tile:hover img{transform:scale(1.08);}
-.gallery-tile-overlay{position:absolute; inset:0; background:linear-gradient(180deg,transparent 40%,rgba(38,38,90,.88) 100%); opacity:0; transition:opacity .35s ease; display:flex; align-items:flex-end; padding:1.1rem 1.2rem;}
-.gallery-tile:hover .gallery-tile-overlay{opacity:1;}
-.gallery-tile-caption{color:#fff; font-family:var(--font-display); font-weight:700; font-size:1.05rem; line-height:1.3; transform:translateY(8px); transition:transform .35s ease;}
-.gallery-tile:hover .gallery-tile-caption{transform:translateY(0);}
-.gallery-tile-category{display:block; font-family:var(--font-mono); font-size:.68rem; font-weight:600; color:var(--marigold); text-transform:uppercase; letter-spacing:.06em; margin-top:.25rem;}
+/* ===== GALLERY (professional grid) ===== */
+.gallery-grid-pro{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1.75rem;}
+.gallery-card-pro{
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+  overflow:hidden; box-shadow:var(--card-shadow); cursor:pointer; display:flex; flex-direction:column;
+  transition:var(--transition);
+}
+.gallery-card-pro:hover{transform:translateY(-6px); box-shadow:0 18px 34px rgba(38,38,90,.16);}
+.gallery-card-pro-img{position:relative; width:100%; aspect-ratio:4/3; overflow:hidden; background:var(--paper-alt);}
+.gallery-card-pro-img img{width:100%; height:100%; object-fit:cover; transition:transform .6s cubic-bezier(.16,1,.3,1);}
+.gallery-card-pro:hover .gallery-card-pro-img img{transform:scale(1.08);}
+.gallery-card-pro-view{
+  position:absolute; inset:0; background:rgba(38,38,90,0); display:flex; align-items:center; justify-content:center;
+  transition:var(--transition);
+}
+.gallery-card-pro:hover .gallery-card-pro-view{background:rgba(38,38,90,.24);}
+.gallery-card-pro-view span{
+  width:44px; height:44px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center;
+  opacity:0; transform:scale(.7); transition:var(--transition); font-size:1.15rem; color:var(--ink); font-weight:800;
+}
+.gallery-card-pro:hover .gallery-card-pro-view span{opacity:1; transform:scale(1);}
+.gallery-card-pro-body{padding:1rem 1.15rem 1.2rem;}
+.gallery-card-pro-cat{
+  display:inline-block; font-family:var(--font-mono); font-size:.65rem; font-weight:700; letter-spacing:.05em;
+  text-transform:uppercase; padding:3px 10px; border-radius:999px; margin-bottom:.6rem;
+}
+.gallery-card-pro-cat.gcat-0{color:var(--sky-deep); background:var(--sky-tint);}
+.gallery-card-pro-cat.gcat-1{color:var(--poppy-deep); background:var(--poppy-tint);}
+.gallery-card-pro-cat.gcat-2{color:var(--meadow-deep); background:var(--meadow-tint);}
+.gallery-card-pro-cat.gcat-3{color:var(--grape-deep); background:var(--grape-tint);}
+.gallery-card-pro-title{font-family:var(--font-display); font-weight:700; font-size:1.02rem; line-height:1.35; color:var(--ink);}
+.gallery-cta{text-align:center; margin-top:2.75rem;}
+@media(max-width:600px){
+  .gallery-grid-pro{grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:1rem;}
+  .gallery-card-pro-body{padding:.85rem .95rem 1rem;}
+}
 
+  
 .lightbox{position:fixed; inset:0; background:rgba(38,38,90,.92); display:none; align-items:center; justify-content:center; z-index:300; padding:24px; flex-direction:column;}
 .lightbox.active{display:flex;}
 .lightbox-frame{max-width:90vw; max-height:80vh; display:flex; flex-direction:column; align-items:center;}
@@ -595,13 +622,19 @@ html{overflow-x:hidden;}
 <div id="affiliations-logos"><div class="empty-state" style="border:none;">Loading…</div></div>
 
 <!-- GALLERY -->
-<div class="section-head reveal">
-  <div class="section-eyebrow">Campus Life</div>
-  <h2 class="section-title" style="margin-bottom:.5rem;" id="galleryTitle">A Look Around Campus</h2>
-  <p>Photos from classrooms, labs, sport and events.</p>
-</div>
-<div class="filter-bar" id="galleryFilters" style="max-width:1150px;margin:0 auto;padding:0 2rem;"></div>
-<div id="gallery-photos-section"><div class="empty-state">Loading gallery…</div></div>
+<section class="standard-section" id="gallery">
+  <div class="reveal">
+    <div class="section-eyebrow">Campus Life</div>
+    <h2 class="section-title" id="galleryTitle" style="margin-bottom:.5rem;">A Look Around Campus</h2>
+    <p style="color:var(--ink-soft); font-weight:600; max-width:560px; margin-bottom:2rem;">Photos from classrooms, labs, sport and events.</p>
+  </div>
+  <div class="filter-bar" id="galleryFilters"></div>
+  <div class="gallery-grid-pro" id="gallery-photos-section"><div class="empty-state">Loading gallery…</div></div>
+  <div class="pagination" id="galleryPagination"></div>
+  <div class="gallery-cta reveal">
+    <a class="btn-secondary" href="gallery.html">View Full Gallery →</a>
+  </div>
+</section>
 
 <!-- VIDEOS -->
 <section class="standard-section" id="videos">
@@ -806,7 +839,9 @@ apiGet('getAffiliations', {}).then(function (res) {
 });
 
 /* GALLERY */
-let galleryData = [], activeGalleryCategory = 'All';
+let galleryData = [], activeGalleryCategory = 'All', galleryPage = 1;
+const GALLERY_PER_PAGE = 8;
+
 apiGet('getGallery', {}).then(function (res) {
   if (!res.ok) return;
   galleryData = res.data;
@@ -815,22 +850,42 @@ apiGet('getGallery', {}).then(function (res) {
   document.querySelectorAll('#galleryFilters .chip').forEach(function (chip) {
     chip.onclick = function () {
       document.querySelectorAll('#galleryFilters .chip').forEach(function (c) { c.classList.remove('active'); });
-      chip.classList.add('active'); activeGalleryCategory = chip.dataset.cat; renderGallery();
+      chip.classList.add('active'); activeGalleryCategory = chip.dataset.cat; galleryPage = 1; renderGallery();
     };
   });
   renderGallery();
 });
+
+function galleryCatClass_(cat, cats) {
+  const idx = cats.indexOf(cat);
+  return 'gcat-' + (idx > -1 ? idx % 4 : 0);
+}
+
 function renderGallery() {
-  const list = activeGalleryCategory === 'All' ? galleryData : galleryData.filter(function (g) { return g.category === activeGalleryCategory; });
+  const full = activeGalleryCategory === 'All' ? galleryData : galleryData.filter(function (g) { return g.category === activeGalleryCategory; });
+  const cats = Array.from(new Set(galleryData.map(function (g) { return g.category || 'General'; })));
   const grid = document.getElementById('gallery-photos-section');
-  if (!list.length) { grid.innerHTML = '<div class="empty-state">No photos yet.</div>'; return; }
-  grid.innerHTML = list.map(function (g) {
-    return '<div class="gallery-tile" data-src="' + esc(g.imageUrl) + '" data-title="' + esc(g.title) + '" data-category="' + esc(g.category || 'General') + '">' +
-      '<img src="' + esc(g.imageUrl) + '" alt="' + esc(g.title) + '" loading="lazy">' +
-      '<div class="gallery-tile-overlay"><div class="gallery-tile-caption">' + esc(g.title) + '<span class="gallery-tile-category">' + esc(g.category || 'General') + '</span></div></div>' +
-      '</div>';
+  const pagWrap = document.getElementById('galleryPagination');
+
+  if (!full.length) { grid.innerHTML = '<div class="empty-state">No photos yet.</div>'; pagWrap.innerHTML = ''; return; }
+
+  const totalPages = Math.max(1, Math.ceil(full.length / GALLERY_PER_PAGE));
+  if (galleryPage > totalPages) galleryPage = totalPages;
+  const start = (galleryPage - 1) * GALLERY_PER_PAGE;
+  const pageItems = full.slice(start, start + GALLERY_PER_PAGE);
+
+  grid.innerHTML = pageItems.map(function (g) {
+    const cat = g.category || 'General';
+    return '<div class="gallery-card-pro" data-src="' + esc(g.imageUrl) + '" data-title="' + esc(g.title) + '" data-category="' + esc(cat) + '">' +
+      '<div class="gallery-card-pro-img"><img src="' + esc(g.imageUrl) + '" alt="' + esc(g.title) + '" loading="lazy">' +
+      '<div class="gallery-card-pro-view"><span>+</span></div></div>' +
+      '<div class="gallery-card-pro-body">' +
+      '<span class="gallery-card-pro-cat ' + galleryCatClass_(cat, cats) + '">' + esc(cat) + '</span>' +
+      '<div class="gallery-card-pro-title">' + esc(g.title) + '</div>' +
+      '</div></div>';
   }).join('');
-  document.querySelectorAll('.gallery-tile').forEach(function (el) {
+
+  document.querySelectorAll('.gallery-card-pro').forEach(function (el) {
     el.onclick = function () {
       document.getElementById('lightboxImg').src = el.dataset.src;
       document.getElementById('lightboxTitle').textContent = el.dataset.title;
@@ -838,9 +893,18 @@ function renderGallery() {
       document.getElementById('lightbox').classList.add('active');
     };
   });
+
+  let pag = '';
+  for (let i = 1; i <= totalPages; i++) pag += '<div class="page-btn' + (i === galleryPage ? ' active' : '') + '" data-page="' + i + '">' + i + '</div>';
+  pagWrap.innerHTML = totalPages > 1 ? pag : '';
+  document.querySelectorAll('#galleryPagination .page-btn').forEach(function (btn) {
+    btn.onclick = function () { galleryPage = parseInt(btn.dataset.page, 10); renderGallery(); document.getElementById('gallery').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  });
 }
+
 document.getElementById('lightboxClose').onclick = function () { document.getElementById('lightbox').classList.remove('active'); };
 document.getElementById('lightbox').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('active'); });
+  
 
 /* NEWS */
 let newsPage = 1, newsQuery = '', newsCategory = '';
